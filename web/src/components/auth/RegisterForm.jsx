@@ -64,6 +64,7 @@ import { UserContext } from '../../context/User';
 import { StatusContext } from '../../context/Status';
 import { useTranslation } from 'react-i18next';
 import { SiDiscord } from 'react-icons/si';
+import HeaderLogo from '../layout/headerbar/HeaderLogo';
 
 const RegisterForm = () => {
   let navigate = useNavigate();
@@ -395,12 +396,14 @@ const RegisterForm = () => {
     return (
       <div className='flex flex-col items-center'>
         <div className='w-full max-w-md'>
-          <div className='flex items-center justify-center mb-6 gap-2'>
-            <img src={logo} alt='Logo' className='h-10 rounded-full' />
-            <Title heading={3} className='!text-gray-800'>
-              {systemName}
-            </Title>
-          </div>
+          <HeaderLogo
+            systemName={systemName}
+            logo={logo}
+            centered
+            linkTo='/'
+            className='mb-6 w-full justify-center'
+            textClassName='text-4xl sm:text-5xl'
+          />
 
           <Card className='border-0 !rounded-2xl overflow-hidden'>
             <div className='flex justify-center pt-6 pb-2'>
@@ -558,11 +561,14 @@ const RegisterForm = () => {
     return (
       <div className='flex flex-col items-center'>
         <div className='w-full max-w-md'>
-          <div className='flex items-center justify-center mb-6 gap-2'>
-            <Title heading={3} className='!text-gray-800'>
-              {systemName}
-            </Title>
-          </div>
+          <HeaderLogo
+            systemName={systemName}
+            logo={logo}
+            centered
+            linkTo='/'
+            className='mb-6 w-full justify-center'
+            textClassName='text-4xl sm:text-5xl'
+          />
 
           <Card className='border-0 !rounded-2xl overflow-hidden'>
             <div className='flex justify-center pt-6 pb-2'>

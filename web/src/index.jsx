@@ -52,6 +52,34 @@ function SemiLocaleWrapper({ children }) {
   return <LocaleProvider locale={semiLocale}>{children}</LocaleProvider>;
 }
 
+function BootCleanup() {
+  React.useEffect(() => {
+    const body = document.body;
+    const splash = document.getElementById('boot-splash');
+
+    body.classList.remove(
+      'preboot-default',
+      'preboot-landing',
+      'preboot-auth',
+      'preboot-console',
+      'preboot-dark',
+    );
+
+    if (!splash) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      splash.classList.add('boot-splash--exit');
+      window.setTimeout(() => {
+        splash.remove();
+      }, 260);
+    });
+  }, []);
+
+  return null;
+}
+
 // initialization
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -68,6 +96,7 @@ root.render(
         >
           <ThemeProvider>
             <SemiLocaleWrapper>
+              <BootCleanup />
               <PageLayout />
             </SemiLocaleWrapper>
           </ThemeProvider>

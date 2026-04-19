@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <link rel="icon" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#f6efe7" />
     <meta
       name="description"
       lang="zh"
@@ -28,13 +28,453 @@
 
     <meta name="generator" content="new-api" />
     <title>New API</title>
+    <style>
+      :root {
+        --boot-bg: #faf5ee;
+        --boot-panel: rgba(255, 251, 247, 0.82);
+        --boot-panel-strong: rgba(255, 251, 247, 0.92);
+        --boot-border: rgba(138, 99, 73, 0.18);
+        --boot-shadow: 0 24px 72px rgba(74, 45, 24, 0.14);
+        --boot-glow-primary: rgba(194, 101, 42, 0.22);
+        --boot-glow-secondary: rgba(232, 160, 120, 0.18);
+        --boot-text: #231815;
+        --boot-text-muted: rgba(60, 35, 20, 0.68);
+        --boot-accent: #c2652a;
+        --boot-accent-soft: rgba(194, 101, 42, 0.12);
+      }
+
+      html,
+      body,
+      #root {
+        min-height: 100%;
+      }
+
+      html {
+        background: var(--boot-bg);
+      }
+
+      body {
+        margin: 0;
+        background-color: var(--boot-bg);
+        color: var(--boot-text);
+      }
+
+      body.preboot-dark {
+        --boot-bg: #0f0b09;
+        --boot-panel: rgba(28, 23, 20, 0.82);
+        --boot-panel-strong: rgba(21, 17, 15, 0.94);
+        --boot-border: rgba(251, 232, 216, 0.08);
+        --boot-shadow: 0 24px 72px rgba(0, 0, 0, 0.34);
+        --boot-glow-primary: rgba(194, 101, 42, 0.24);
+        --boot-glow-secondary: rgba(251, 146, 60, 0.14);
+        --boot-text: #f7eadf;
+        --boot-text-muted: rgba(247, 234, 223, 0.68);
+        --boot-accent-soft: rgba(194, 101, 42, 0.18);
+      }
+
+      body.preboot-default {
+        background-image:
+          radial-gradient(circle at 86% 10%, rgba(232, 160, 120, 0.16) 0, transparent 24%),
+          linear-gradient(180deg, #f8f2ea 0%, #f3ece4 100%);
+      }
+
+      body.preboot-landing {
+        background-image:
+          radial-gradient(circle at 18% 10%, var(--boot-glow-primary) 0, transparent 28%),
+          radial-gradient(circle at 82% 12%, rgba(255, 237, 213, 0.88) 0, transparent 24%),
+          linear-gradient(180deg, #fbf7f2 0%, #f6efe7 50%, #fbf8f4 100%);
+      }
+
+      body.preboot-auth {
+        background-image:
+          radial-gradient(circle at 12% 18%, rgba(232, 160, 120, 0.2) 0, transparent 26%),
+          radial-gradient(circle at 88% 12%, rgba(255, 245, 235, 0.92) 0, transparent 24%),
+          linear-gradient(180deg, #f9f3ec 0%, #f2eae0 54%, #f8f3ee 100%);
+      }
+
+      body.preboot-console {
+        background-image:
+          radial-gradient(circle at 14% 8%, rgba(194, 101, 42, 0.12) 0, transparent 24%),
+          linear-gradient(180deg, #f5efe7 0%, #efe7de 100%);
+      }
+
+      body.preboot-dark.preboot-landing {
+        background-image:
+          radial-gradient(circle at 18% 10%, var(--boot-glow-primary) 0, transparent 30%),
+          radial-gradient(circle at 82% 12%, rgba(120, 53, 15, 0.2) 0, transparent 24%),
+          linear-gradient(180deg, #100c0a 0%, #15100d 52%, #0f0b09 100%);
+      }
+
+      body.preboot-dark.preboot-auth {
+        background-image:
+          radial-gradient(circle at 12% 18%, rgba(194, 101, 42, 0.18) 0, transparent 26%),
+          radial-gradient(circle at 88% 12%, rgba(120, 53, 15, 0.16) 0, transparent 24%),
+          linear-gradient(180deg, #130f0c 0%, #17120f 54%, #100c0a 100%);
+      }
+
+      body.preboot-dark.preboot-console {
+        background-image:
+          radial-gradient(circle at 14% 8%, rgba(194, 101, 42, 0.12) 0, transparent 24%),
+          linear-gradient(180deg, #120e0c 0%, #181210 100%);
+      }
+
+      #root {
+        position: relative;
+        z-index: 1;
+      }
+
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 20px;
+        pointer-events: none;
+        transition:
+          opacity 220ms ease,
+          transform 220ms ease;
+      }
+
+      #boot-splash.boot-splash--exit {
+        opacity: 0;
+        transform: scale(1.015);
+      }
+
+      .boot-shell {
+        width: min(100%, 860px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .boot-shell__badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 16px;
+        border-radius: 999px;
+        border: 1px solid var(--boot-border);
+        background: var(--boot-panel);
+        box-shadow: 0 10px 30px rgba(74, 45, 24, 0.08);
+        backdrop-filter: blur(16px);
+        font-family: Manrope, sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--boot-text-muted);
+      }
+
+      .boot-shell__pulse {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--boot-accent);
+        box-shadow: 0 0 0 0 rgba(194, 101, 42, 0.3);
+        animation: bootPulse 1.6s infinite ease-out;
+      }
+
+      .boot-shell__brand {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        text-align: center;
+      }
+
+      .boot-shell__logo-frame {
+        display: inline-flex;
+        width: 72px;
+        height: 72px;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        border-radius: 999px;
+        border: 1px solid var(--boot-border);
+        background: var(--boot-panel-strong);
+        box-shadow: var(--boot-shadow);
+      }
+
+      .boot-shell__logo-frame img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .boot-shell__wordmark {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .boot-shell__title {
+        font-family: 'EB Garamond', serif;
+        font-size: clamp(48px, 7vw, 80px);
+        line-height: 0.92;
+        font-style: italic;
+        font-weight: 600;
+        color: var(--boot-accent);
+        text-shadow: 0 10px 32px rgba(74, 45, 24, 0.12);
+      }
+
+      .boot-shell__subtitle {
+        font-family: Manrope, sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: var(--boot-text-muted);
+      }
+
+      .boot-shell__panel {
+        width: min(100%, 680px);
+        min-height: 176px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 28px;
+        border-radius: 28px;
+        border: 1px solid var(--boot-border);
+        background: var(--boot-panel);
+        box-shadow: var(--boot-shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .boot-shell__row {
+        display: flex;
+        gap: 14px;
+      }
+
+      .boot-shell__line,
+      .boot-shell__metric {
+        position: relative;
+        overflow: hidden;
+        border-radius: 999px;
+        background: var(--boot-accent-soft);
+      }
+
+      .boot-shell__line::after,
+      .boot-shell__metric::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), transparent);
+        animation: bootShimmer 1.7s infinite;
+      }
+
+      .boot-shell__line {
+        height: 14px;
+      }
+
+      .boot-shell__line--wide {
+        width: 72%;
+      }
+
+      .boot-shell__line--mid {
+        width: 56%;
+      }
+
+      .boot-shell__line--short {
+        width: 38%;
+      }
+
+      .boot-shell__metric {
+        flex: 1;
+        height: 64px;
+        border-radius: 22px;
+      }
+
+      body.preboot-console .boot-shell {
+        width: min(100%, 520px);
+        align-items: flex-start;
+      }
+
+      body.preboot-console .boot-shell__badge {
+        display: none;
+      }
+
+      body.preboot-console .boot-shell__brand {
+        justify-content: flex-start;
+        text-align: left;
+      }
+
+      body.preboot-console .boot-shell__panel {
+        min-height: 104px;
+        width: min(100%, 420px);
+      }
+
+      body.preboot-auth .boot-shell {
+        width: min(100%, 540px);
+      }
+
+      body.preboot-auth .boot-shell__badge {
+        display: none;
+      }
+
+      body.preboot-auth .boot-shell__panel {
+        width: min(100%, 420px);
+        min-height: 208px;
+      }
+
+      @media (max-width: 640px) {
+        #boot-splash {
+          padding: 24px 16px;
+        }
+
+        .boot-shell {
+          gap: 16px;
+        }
+
+        .boot-shell__brand {
+          gap: 14px;
+        }
+
+        .boot-shell__logo-frame {
+          width: 58px;
+          height: 58px;
+        }
+
+        .boot-shell__panel {
+          padding: 22px;
+          border-radius: 24px;
+        }
+
+        .boot-shell__row {
+          flex-direction: column;
+        }
+      }
+
+      @keyframes bootPulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(194, 101, 42, 0.32);
+        }
+        70% {
+          box-shadow: 0 0 0 10px rgba(194, 101, 42, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(194, 101, 42, 0);
+        }
+      }
+
+      @keyframes bootShimmer {
+        100% {
+          transform: translateX(100%);
+        }
+      }
+    </style>
     <!--umami-->
     <!--Google Analytics-->
   </head>
 
   <body>
+    <script>
+      (function () {
+        var path = window.location.pathname || '/';
+        var body = document.body;
+        var themeMode = 'auto';
+        try {
+          themeMode = localStorage.getItem('theme-mode') || 'auto';
+        } catch (error) {}
+        var systemDark =
+          typeof window.matchMedia === 'function' &&
+          window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var actualDark = themeMode === 'dark' || (themeMode === 'auto' && systemDark);
+        var variant = 'default';
+        if (path === '/') {
+          variant = 'landing';
+        } else if (
+          path === '/login' ||
+          path === '/register' ||
+          path === '/reset' ||
+          path === '/user/reset' ||
+          path.indexOf('/oauth/') === 0
+        ) {
+          variant = 'auth';
+        } else if (path.indexOf('/console') === 0) {
+          variant = 'console';
+        }
+        body.classList.add('preboot-' + variant);
+        if (actualDark) {
+          body.classList.add('preboot-dark');
+          document.documentElement.classList.add('dark');
+        }
+        window.__NEW_API_BOOT__ = {
+          variant: variant,
+          systemName: (function () {
+            try {
+              return localStorage.getItem('system_name') || 'Sisyphus';
+            } catch (error) {
+              return 'Sisyphus';
+            }
+          })(),
+          logo: (function () {
+            try {
+              return localStorage.getItem('logo') || '/logo.png';
+            } catch (error) {
+              return '/logo.png';
+            }
+          })(),
+          subtitle:
+            variant === 'landing'
+              ? 'API Gateway'
+              : variant === 'auth'
+                ? 'Secure Access'
+                : variant === 'console'
+                  ? 'Control Surface'
+                  : 'Model Hub',
+        };
+      })();
+    </script>
     <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="boot-splash" aria-hidden="true">
+      <div class="boot-shell">
+        <div class="boot-shell__badge">
+          <span class="boot-shell__pulse"></span>
+          <span>Gateway booting</span>
+        </div>
+        <div class="boot-shell__brand">
+          <span class="boot-shell__logo-frame">
+            <img id="boot-brand-logo" src="/logo.png" alt="Brand logo" />
+          </span>
+          <div class="boot-shell__wordmark">
+            <strong id="boot-brand-name" class="boot-shell__title">Sisyphus</strong>
+            <span id="boot-brand-subtitle" class="boot-shell__subtitle">API Gateway</span>
+          </div>
+        </div>
+        <div class="boot-shell__panel">
+          <div class="boot-shell__line boot-shell__line--wide"></div>
+          <div class="boot-shell__line boot-shell__line--mid"></div>
+          <div class="boot-shell__line boot-shell__line--short"></div>
+          <div class="boot-shell__row">
+            <div class="boot-shell__metric"></div>
+            <div class="boot-shell__metric"></div>
+            <div class="boot-shell__metric"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="root"></div>
+    <script>
+      (function () {
+        var boot = window.__NEW_API_BOOT__ || {};
+        var logo = document.getElementById('boot-brand-logo');
+        var name = document.getElementById('boot-brand-name');
+        var subtitle = document.getElementById('boot-brand-subtitle');
+        if (logo && boot.logo) {
+          logo.src = boot.logo;
+        }
+        if (name && boot.systemName) {
+          name.textContent = boot.systemName;
+        }
+        if (subtitle && boot.subtitle) {
+          subtitle.textContent = boot.subtitle;
+        }
+      })();
+    </script>
     <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>
