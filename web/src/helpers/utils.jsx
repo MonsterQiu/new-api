@@ -52,10 +52,29 @@ export function getSystemName() {
   return system_name;
 }
 
+const BRAND_ASSET_VERSION = '20260419-brand-2';
+const DEFAULT_LOGO_PATH = `/logo.png?v=${BRAND_ASSET_VERSION}`;
+const DEFAULT_FAVICON_PATH = `/favicon.ico?v=${BRAND_ASSET_VERSION}`;
+
+function withBrandAssetVersion(assetPath) {
+  if (!assetPath) return assetPath;
+  if (!assetPath.startsWith('/')) return assetPath;
+  if (assetPath.includes('://') || assetPath.startsWith('//')) return assetPath;
+  if (assetPath.includes('v=')) return assetPath;
+  const separator = assetPath.includes('?') ? '&' : '?';
+  return `${assetPath}${separator}v=${BRAND_ASSET_VERSION}`;
+}
+
 export function getLogo() {
   let logo = localStorage.getItem('logo');
-  if (!logo) return '/logo.png';
-  return logo;
+  if (!logo) return DEFAULT_LOGO_PATH;
+  return withBrandAssetVersion(logo);
+}
+
+export function getFavicon() {
+  let logo = localStorage.getItem('logo');
+  if (!logo) return DEFAULT_FAVICON_PATH;
+  return withBrandAssetVersion(logo);
 }
 
 export function getUserIdFromLocalStorage() {

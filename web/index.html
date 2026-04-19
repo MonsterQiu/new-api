@@ -2,7 +2,8 @@
 <html lang="zh">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="/logo.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260419-brand-2" />
+    <link rel="shortcut icon" href="/favicon.ico?v=20260419-brand-2" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f6efe7" />
     <meta
@@ -375,6 +376,13 @@
       (function () {
         var path = window.location.pathname || '/';
         var body = document.body;
+        var brandAssetVersion = '20260419-brand-2';
+        var withBrandAssetVersion = function (assetPath) {
+          if (!assetPath || assetPath.charAt(0) !== '/' || assetPath.indexOf('v=') !== -1) {
+            return assetPath;
+          }
+          return assetPath + (assetPath.indexOf('?') === -1 ? '?' : '&') + 'v=' + brandAssetVersion;
+        };
         var themeMode = 'auto';
         try {
           themeMode = localStorage.getItem('theme-mode') || 'auto';
@@ -413,9 +421,9 @@
           })(),
           logo: (function () {
             try {
-              return localStorage.getItem('logo') || '/logo.png';
+              return withBrandAssetVersion(localStorage.getItem('logo')) || withBrandAssetVersion('/logo.png');
             } catch (error) {
-              return '/logo.png';
+              return withBrandAssetVersion('/logo.png');
             }
           })(),
           subtitle:
@@ -438,7 +446,7 @@
         </div>
         <div class="boot-shell__brand">
           <span class="boot-shell__logo-frame">
-            <img id="boot-brand-logo" src="/logo.png" alt="Brand logo" />
+            <img id="boot-brand-logo" src="/logo.png?v=20260419-brand-2" alt="Brand logo" />
           </span>
           <div class="boot-shell__wordmark">
             <strong id="boot-brand-name" class="boot-shell__title">Sisyphus</strong>
