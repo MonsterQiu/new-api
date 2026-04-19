@@ -138,6 +138,50 @@ docker-compose --env-file deploy/.env.prod -f deploy/compose.prod.yml pull new-a
 docker-compose --env-file deploy/.env.prod -f deploy/compose.prod.yml up -d new-api
 ```
 
+## 发版方式三：GitHub Actions 一键发布到生产
+
+仓库里新增了 `release-and-deploy-prod.yml` 工作流。
+
+这条链路适合你现在的目标：
+
+- 本地只负责改代码并 `git push`
+- GitHub Actions 自动构建镜像
+- Actions 通过 SSH 登录服务器
+- 服务器自动更新 `NEW_API_IMAGE` 并执行 `pull + up -d new-api`
+
+你只需要在 GitHub 仓库里配置 3 个 Secrets：
+
+- `PROD_SSH_HOST`: 生产服务器地址，例如 `45.77.123.117`
+- `PROD_SSH_USER`: 登录用户，例如 `root`
+- `PROD_SSH_PRIVATE_KEY`: 专门给 GitHub Actions 用的私钥
+
+建议单独创建一把部署密钥，不要直接复用你个人电脑上的密钥。
+
+### 服务器准备
+
+第一次把脚本同步到服务器：
+
+```bash
+cd /root/new-api-deploy
+git pull origin main
+chmod +x deploy/remote-deploy-prod.sh
+```
+
+### 以后的一键发布流程
+
+1. 本地改代码并推送到 `main`
+2. 打开 GitHub `Actions`
+3. 运行 `Release And Deploy Production`
+4. 可选填写 `image_tag`
+5. 等待工作流完成
+
+完成后会自动：
+
+- 构建 `ghcr.io/<owner>/<repo>:<tag>`
+- SSH 到生产服务器
+- 更新 `/root/new-api-deploy/deploy/.env.prod` 里的 `NEW_API_IMAGE`
+- 重启 `new-api`
+
 ## Caddy 建议
 
 把生产和预发都只转发到本机端口：
