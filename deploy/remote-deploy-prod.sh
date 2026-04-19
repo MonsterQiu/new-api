@@ -2,7 +2,7 @@
 set -euo pipefail
 
 IMAGE="${1:-${IMAGE:-}}"
-REPO_DIR="${2:-${REPO_DIR:-/root/new-api-deploy}}"
+REPO_DIR="${2:-${REPO_DIR:-/opt/new-api-deploy}}"
 ENV_FILE="$REPO_DIR/deploy/.env.prod"
 COMPOSE_FILE="$REPO_DIR/deploy/compose.prod.yml"
 STATUS_URL="${STATUS_URL:-http://127.0.0.1:3000/api/status}"

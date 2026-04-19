@@ -102,7 +102,7 @@ jobs:
       - name: Deploy on production runner
         shell: bash
         run: |
-          bash deploy/remote-deploy-prod.sh "${{ needs.docker.outputs.full_image }}" /root/new-api-deploy
+          bash deploy/remote-deploy-prod.sh "${{ needs.docker.outputs.full_image }}" /opt/new-api-deploy
 
       - name: Summary
         shell: bash
