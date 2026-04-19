@@ -21,6 +21,9 @@ on:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    outputs:
+      full_image: ${{ steps.meta.outputs.full_image }}
+      image_tag: ${{ steps.meta.outputs.tag }}
     permissions:
       contents: read
       packages: write
@@ -47,6 +50,7 @@ jobs:
           echo "$TAG" > VERSION
           echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "full_image=${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
           {
             echo "tags<<EOF"
             echo "${IMAGE}:${TAG}"
@@ -79,3 +83,28 @@ jobs:
       - name: Summary
         run: |
           echo "Published image: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+
+  deploy-prod:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: docker
+    runs-on: [self-hosted, linux, x64, prod, new-api]
+    timeout-minutes: 15
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Deploy on production runner
+        shell: bash
+        run: |
+          bash deploy/remote-deploy-prod.sh "${{ needs.docker.outputs.full_image }}" /root/new-api-deploy
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo "Deployed image: ${{ needs.docker.outputs.full_image }}" >> "$GITHUB_STEP_SUMMARY"
