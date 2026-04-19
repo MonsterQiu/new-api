@@ -69,11 +69,20 @@ jobs:
           chmod 600 ~/.ssh/prod_key
           ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts
 
+      - name: Sync deploy assets
+        shell: bash
+        run: |
+          REMOTE="${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}"
+          ssh -i ~/.ssh/prod_key "$REMOTE" "mkdir -p '$DEPLOY_DIR/deploy'"
+          scp -O -i ~/.ssh/prod_key deploy/remote-deploy-prod.sh "$REMOTE:$DEPLOY_DIR/deploy/remote-deploy-prod.sh.upload"
+          ssh -i ~/.ssh/prod_key "$REMOTE" \
+            "mv '$DEPLOY_DIR/deploy/remote-deploy-prod.sh.upload' '$DEPLOY_DIR/deploy/remote-deploy-prod.sh' && chmod +x '$DEPLOY_DIR/deploy/remote-deploy-prod.sh'"
+
       - name: Deploy on server
         shell: bash
         run: |
           ssh -i ~/.ssh/prod_key "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }}" \
-            "bash '$DEPLOY_DIR/deploy/remote-deploy-prod.sh' '${{ steps.meta.outputs.full_image }}' '$DEPLOY_DIR'"
+            bash "$DEPLOY_DIR/deploy/remote-deploy-prod.sh" "${{ steps.meta.outputs.full_image }}" "$DEPLOY_DIR"
 
       - name: Summary
         run: |
