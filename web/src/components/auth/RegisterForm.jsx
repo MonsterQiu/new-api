@@ -559,7 +559,6 @@ const RegisterForm = () => {
       <div className='flex flex-col items-center'>
         <div className='w-full max-w-md'>
           <div className='flex items-center justify-center mb-6 gap-2'>
-            <img src={logo} alt='Logo' className='h-10 rounded-full' />
             <Title heading={3} className='!text-gray-800'>
               {systemName}
             </Title>
@@ -568,7 +567,7 @@ const RegisterForm = () => {
           <Card className='border-0 !rounded-2xl overflow-hidden'>
             <div className='flex justify-center pt-6 pb-2'>
               <Title heading={3} className='text-gray-800 dark:text-gray-200'>
-                {t('注 册')}
+                {t('~注 册~')}
               </Title>
             </div>
             <div className='px-2 py-8'>
@@ -772,14 +771,7 @@ const RegisterForm = () => {
   return (
     <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8'>
       {/* 背景模糊晕染球 */}
-      <div
-        className='blur-ball blur-ball-indigo'
-        style={{ top: '-80px', right: '-80px', transform: 'none' }}
-      />
-      <div
-        className='blur-ball blur-ball-teal'
-        style={{ top: '50%', left: '-120px' }}
-      />
+      
       <div className='w-full max-w-sm mt-[60px]'>
         {showEmailRegister ||
         !hasOAuthRegisterOptions

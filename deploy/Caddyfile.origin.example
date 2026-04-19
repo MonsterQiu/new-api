@@ -1,0 +1,22 @@
+# Replace origin.ymsunv.com with your actual Cloudflare for SaaS fallback origin.
+# Keep Caddy as the only public origin. new-api should listen on 127.0.0.1 only.
+
+origin.ymsunv.com {
+    encode zstd gzip
+
+    reverse_proxy 127.0.0.1:3000 {
+        # Reduce buffering for SSE / streaming responses.
+        flush_interval -1
+    }
+}
+
+beta-origin.ymsunv.com {
+    encode zstd gzip
+
+    reverse_proxy 127.0.0.1:3001 {
+        flush_interval -1
+    }
+}
+
+# If you need accurate visitor IPs in upstream logs, add Cloudflare trusted proxy
+# ranges in your real Caddyfile. Keep that list outside the repo because it changes.

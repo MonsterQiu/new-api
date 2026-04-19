@@ -49,6 +49,12 @@ const PageLayout = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { i18n } = useTranslation();
   const location = useLocation();
+  const authRoutes = new Set([
+    '/login',
+    '/register',
+    '/reset',
+    '/user/reset',
+  ]);
 
   const cardProPages = [
     '/console/channel',
@@ -63,14 +69,45 @@ const PageLayout = () => {
   ];
 
   const shouldHideFooter = cardProPages.includes(location.pathname);
+  const isLandingPage = location.pathname === '/';
+  const isConsoleRoute = location.pathname.startsWith('/console');
+  const isAuthPage =
+    authRoutes.has(location.pathname) || location.pathname.startsWith('/oauth/');
 
   const shouldInnerPadding =
     location.pathname.includes('/console') &&
     !location.pathname.startsWith('/console/chat') &&
     location.pathname !== '/console/playground';
+  const isImmersiveConsoleRoute =
+    location.pathname.startsWith('/console/chat') ||
+    location.pathname === '/console/playground';
 
-  const isConsoleRoute = location.pathname.startsWith('/console');
   const showSider = isConsoleRoute && (!isMobile || drawerOpen);
+  const pageShellVariant = isLandingPage
+    ? 'landing'
+    : isAuthPage
+      ? 'auth'
+      : isConsoleRoute
+        ? 'console'
+        : 'default';
+  const contentClassName = [
+    'app-layout-content',
+    `app-layout-content--${pageShellVariant}`,
+    showSider ? 'app-layout-content--with-sider' : '',
+    isImmersiveConsoleRoute ? 'app-layout-content--immersive' : '',
+    shouldHideFooter ? 'app-layout-content--footerless' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const frameClassName = [
+    'app-page-frame',
+    `app-page-frame--${pageShellVariant}`,
+    isMobile ? 'app-page-frame--mobile' : '',
+    isImmersiveConsoleRoute ? 'app-page-frame--immersive' : '',
+    shouldHideFooter ? 'app-page-frame--footerless' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   useEffect(() => {
     if (isMobile && drawerOpen && collapsed) {
@@ -209,6 +246,7 @@ const PageLayout = () => {
           }}
         >
           <Content
+            className={contentClassName}
             style={{
               flex: '1 0 auto',
               overflowY: isMobile ? 'visible' : 'hidden',
@@ -217,10 +255,13 @@ const PageLayout = () => {
               position: 'relative',
             }}
           >
-            <ErrorBoundary>
-              <App />
-            </ErrorBoundary>
+            <div className={frameClassName}>
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
+            </div>
           </Content>
+          
           {!shouldHideFooter && (
             <Layout.Footer
               style={{

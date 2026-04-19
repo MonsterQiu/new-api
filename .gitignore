@@ -22,6 +22,9 @@ tiktoken_cache
 web/bun.lock
 plans
 .claude
+deploy/.env.prod
+deploy/.env.preview
+deploy/.env.release
 
 electron/node_modules
 electron/dist

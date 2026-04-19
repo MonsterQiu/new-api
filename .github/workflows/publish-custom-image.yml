@@ -1,0 +1,79 @@
+name: Publish Custom Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional tag override. Defaults to ui-YYYYMMDD-SHORTSHA
+        required: false
+        type: string
+      push_latest:
+        description: Also push latest
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "ui-*"
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve image metadata
+        id: meta
+        shell: bash
+        run: |
+          REPOSITORY_LOWER=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${REPOSITORY_LOWER}"
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            TAG="${{ github.event.inputs.image_tag }}"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="ui-$(date +'%Y%m%d')-$(git rev-parse --short HEAD)"
+          fi
+          echo "$TAG" > VERSION
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE}:${TAG}"
+            if [[ "${{ github.event.inputs.push_latest }}" == "true" ]]; then
+              echo "${IMAGE}:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          echo "Published image: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}" >> $GITHUB_STEP_SUMMARY

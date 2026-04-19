@@ -59,6 +59,7 @@ root.render(
   <React.StrictMode>
     <StatusProvider>
       <UserProvider>
+
         <BrowserRouter
           future={{
             v7_startTransition: true,
@@ -71,6 +72,7 @@ root.render(
             </SemiLocaleWrapper>
           </ThemeProvider>
         </BrowserRouter>
+        
       </UserProvider>
     </StatusProvider>
   </React.StrictMode>,

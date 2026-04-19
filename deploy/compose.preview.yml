@@ -1,0 +1,58 @@
+services:
+  new-api:
+    image: ${NEW_API_IMAGE:?set NEW_API_IMAGE in the env file}
+    restart: unless-stopped
+    command:
+      - --log-dir
+      - /data/logs
+    ports:
+      - "${APP_BIND_IP:-127.0.0.1}:${APP_PORT:-3001}:3000"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      SQL_DSN: ${SQL_DSN:?set SQL_DSN in the env file}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in the env file}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-}
+      RELAY_TIMEOUT: ${RELAY_TIMEOUT:-0}
+      STREAMING_TIMEOUT: ${STREAMING_TIMEOUT:-600}
+      ERROR_LOG_ENABLED: ${ERROR_LOG_ENABLED:-true}
+      BATCH_UPDATE_ENABLED: ${BATCH_UPDATE_ENABLED:-true}
+    volumes:
+      - ${APP_DATA_DIR:?set APP_DATA_DIR in the env file}:/data
+    depends_on:
+      - mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:3000/api/status | grep -o '\"success\":\\s*true' || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    command:
+      - --default-authentication-plugin=caching_sha2_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in the env file}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-new-api-preview}
+    volumes:
+      - ${MYSQL_DATA_DIR:?set MYSQL_DATA_DIR in the env file}:/var/lib/mysql
+    expose:
+      - "3306"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s

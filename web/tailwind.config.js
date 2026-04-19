@@ -132,6 +132,8 @@ export default {
       'semi-color-data-17': 'var(--semi-color-data-17)',
       'semi-color-data-18': 'var(--semi-color-data-18)',
       'semi-color-data-19': 'var(--semi-color-data-19)',
+      'brand-primary': '#c2652a',
+      'brand-primary-hover': '#fb923c',
     },
     extend: {
       borderRadius: {
@@ -142,6 +144,10 @@ export default {
         'semi-border-radius-large': 'var(--semi-border-radius-large)',
         'semi-border-radius-circle': 'var(--semi-border-radius-circle)',
         'semi-border-radius-full': 'var(--semi-border-radius-full)',
+      },
+      fontFamily: {
+        headline: ['"EB Garamond"', 'serif'],
+        body: ['Manrope', 'sans-serif'],
       },
     },
   },
