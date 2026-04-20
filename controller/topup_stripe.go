@@ -29,6 +29,18 @@ const (
 
 var stripeAdaptor = &StripeAdaptor{}
 
+func stripeSecretConfigured() bool {
+	return strings.HasPrefix(setting.StripeApiSecret, "sk_") || strings.HasPrefix(setting.StripeApiSecret, "rk_")
+}
+
+func stripeTopUpConfigured() bool {
+	return stripeSecretConfigured() && setting.StripeWebhookSecret != "" && setting.StripePriceId != ""
+}
+
+func isStripeTopUpReference(referenceId string) bool {
+	return strings.HasPrefix(referenceId, "ref_")
+}
+
 // StripePayRequest represents a payment request for Stripe checkout.
 type StripePayRequest struct {
 	// Amount is the quantity of units to purchase.
@@ -47,6 +59,10 @@ type StripeAdaptor struct {
 }
 
 func (*StripeAdaptor) RequestAmount(c *gin.Context, req *StripePayRequest) {
+	if !stripeTopUpConfigured() {
+		c.JSON(200, gin.H{"message": "error", "data": "Stripe 充值未启用"})
+		return
+	}
 	if req.Amount < getStripeMinTopup() {
 		c.JSON(200, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", getStripeMinTopup())})
 		return
@@ -66,6 +82,10 @@ func (*StripeAdaptor) RequestAmount(c *gin.Context, req *StripePayRequest) {
 }
 
 func (*StripeAdaptor) RequestPay(c *gin.Context, req *StripePayRequest) {
+	if !stripeTopUpConfigured() {
+		c.JSON(200, gin.H{"message": "error", "data": "Stripe 充值未启用"})
+		return
+	}
 	if req.PaymentMethod != PaymentMethodStripe {
 		c.JSON(200, gin.H{"message": "error", "data": "不支持的支付渠道"})
 		return
@@ -146,6 +166,12 @@ func RequestStripePay(c *gin.Context) {
 }
 
 func StripeWebhook(c *gin.Context) {
+	if setting.StripeWebhookSecret == "" {
+		log.Println("Stripe webhook ignored: webhook secret is not configured")
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
 	payload, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		log.Printf("解析Stripe Webhook参数失败: %v\n", err)
@@ -202,7 +228,12 @@ func sessionCompleted(event stripe.Event) {
 		return
 	}
 
-	err := model.Recharge(referenceId, customerId)
+	if !isStripeTopUpReference(referenceId) {
+		log.Println("invalid stripe topup reference:", referenceId)
+		return
+	}
+
+	err := model.Recharge(referenceId, customerId, PaymentMethodStripe)
 	if err != nil {
 		log.Println(err.Error(), referenceId)
 		return
@@ -233,6 +264,11 @@ func sessionExpired(event stripe.Event) {
 		return
 	} else if err != nil && !errors.Is(err, model.ErrSubscriptionOrderNotFound) {
 		log.Println("过期订阅订单失败", referenceId, ", err:", err.Error())
+		return
+	}
+
+	if !isStripeTopUpReference(referenceId) {
+		log.Println("invalid stripe topup reference:", referenceId)
 		return
 	}
 
@@ -269,7 +305,7 @@ func sessionExpired(event stripe.Event) {
 //
 // Returns the checkout session URL or an error if the session creation fails.
 func genStripeLink(referenceId string, customerId string, email string, amount int64, successURL string, cancelURL string) (string, error) {
-	if !strings.HasPrefix(setting.StripeApiSecret, "sk_") && !strings.HasPrefix(setting.StripeApiSecret, "rk_") {
+	if !stripeSecretConfigured() {
 		return "", fmt.Errorf("无效的Stripe API密钥")
 	}
 
