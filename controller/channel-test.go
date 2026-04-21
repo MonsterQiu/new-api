@@ -56,6 +56,18 @@ func normalizeChannelTestEndpoint(channel *model.Channel, modelName, endpointTyp
 	return normalized
 }
 
+func shouldChannelTestUseStream(channel *model.Channel, modelName, endpointType string) bool {
+	normalizedEndpoint := normalizeChannelTestEndpoint(channel, modelName, endpointType)
+	switch constant.EndpointType(normalizedEndpoint) {
+	case constant.EndpointTypeEmbeddings,
+		constant.EndpointTypeImageGeneration,
+		constant.EndpointTypeJinaRerank,
+		constant.EndpointTypeOpenAIResponseCompact:
+		return false
+	}
+	return channel != nil && channel.Type == constant.ChannelTypeCodex
+}
+
 func testChannel(channel *model.Channel, testModel string, endpointType string, isStream bool) testResult {
 	tik := time.Now()
 	var unsupportedTestChannelTypes = []int{
@@ -753,7 +765,12 @@ func TestChannel(c *gin.Context) {
 	//}()
 	testModel := c.Query("model")
 	endpointType := c.Query("endpoint_type")
-	isStream, _ := strconv.ParseBool(c.Query("stream"))
+	isStream := false
+	if streamQuery, hasStream := c.GetQuery("stream"); hasStream {
+		isStream, _ = strconv.ParseBool(streamQuery)
+	} else {
+		isStream = shouldChannelTestUseStream(channel, testModel, endpointType)
+	}
 	tik := time.Now()
 	result := testChannel(channel, testModel, endpointType, isStream)
 	if result.localErr != nil {
@@ -822,7 +839,7 @@ func testAllChannels(notify bool) error {
 			}
 			isChannelEnabled := channel.Status == common.ChannelStatusEnabled
 			tik := time.Now()
-			result := testChannel(channel, "", "", false)
+			result := testChannel(channel, "", "", shouldChannelTestUseStream(channel, "", ""))
 			tok := time.Now()
 			milliseconds := tok.Sub(tik).Milliseconds()
 

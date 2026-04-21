@@ -58,6 +58,7 @@ const ModelTestModal = ({
   t,
 }) => {
   const hasChannel = Boolean(currentTestChannel);
+  const isCodexChannel = hasChannel && currentTestChannel?.type === 57;
   const streamToggleDisabled = [
     'embeddings',
     'image-generation',
@@ -336,7 +337,9 @@ const ModelTestModal = ({
             icon={<IconInfoCircle />}
             className='!rounded-lg mb-2'
             description={t(
-              '说明：本页测试为非流式请求；若渠道仅支持流式返回，可能出现测试失败，请以实际使用为准。',
+              isCodexChannel
+                ? '说明：Codex 渠道通常需要流式测试；本页已默认开启流式，关闭后可能测试失败，请以实际使用为准。'
+                : '说明：本页测试为非流式请求；若渠道仅支持流式返回，可能出现测试失败，请以实际使用为准。',
             )}
           />
 

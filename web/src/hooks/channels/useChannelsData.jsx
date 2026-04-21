@@ -114,6 +114,22 @@ export const useChannelsData = () => {
   // 使用 ref 来避免闭包问题，类似旧版实现
   const shouldStopBatchTestingRef = useRef(false);
 
+  const isCodexChannel = (channel) => channel?.type === 57;
+
+  const shouldUseStreamingTest = (channel, endpointType = '') => {
+    if (
+      [
+        'embeddings',
+        'image-generation',
+        'jina-rerank',
+        'openai-response-compact',
+      ].includes(endpointType)
+    ) {
+      return false;
+    }
+    return isCodexChannel(channel);
+  };
+
   // Multi-key management states
   const [showMultiKeyManageModal, setShowMultiKeyManageModal] = useState(false);
   const [currentMultiKeyChannel, setCurrentMultiKeyChannel] = useState(null);
@@ -128,6 +144,19 @@ export const useChannelsData = () => {
     searchGroup: '',
     searchModel: '',
   };
+
+  useEffect(() => {
+    if (!showModelTestModal || !currentTestChannel) {
+      return;
+    }
+    setIsStreamTest(
+      shouldUseStreamingTest(currentTestChannel, selectedEndpointType),
+    );
+  }, [
+    showModelTestModal,
+    currentTestChannel,
+    selectedEndpointType,
+  ]);
 
   // Column keys
   const COLUMN_KEYS = {
@@ -863,9 +892,13 @@ export const useChannelsData = () => {
     record,
     model,
     endpointType = '',
-    stream = false,
+    stream,
   ) => {
     const testKey = `${record.id}-${model}`;
+    const resolvedStream =
+      typeof stream === 'boolean'
+        ? stream
+        : shouldUseStreamingTest(record, endpointType);
 
     // 检查是否应该停止批量测试
     if (shouldStopBatchTestingRef.current && isBatchTesting) {
@@ -880,7 +913,7 @@ export const useChannelsData = () => {
       if (endpointType) {
         url += `&endpoint_type=${endpointType}`;
       }
-      if (stream) {
+      if (resolvedStream) {
         url += `&stream=true`;
       }
       const res = await API.get(url);
