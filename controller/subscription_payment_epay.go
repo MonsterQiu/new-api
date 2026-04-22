@@ -59,6 +59,17 @@ func SubscriptionRequestEpay(c *gin.Context) {
 			return
 		}
 	}
+	if plan.TotalPurchaseLimit > 0 {
+		count, err := model.CountSubscriptionsByPlan(plan.Id)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		if count >= int64(plan.TotalPurchaseLimit) {
+			common.ApiErrorMsg(c, "该套餐已售罄")
+			return
+		}
+	}
 
 	callBackAddress := service.GetCallbackAddress()
 	returnUrl, err := url.Parse(callBackAddress + "/api/subscription/epay/return")

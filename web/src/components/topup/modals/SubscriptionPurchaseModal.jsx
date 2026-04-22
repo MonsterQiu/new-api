@@ -70,10 +70,13 @@ const SubscriptionPurchaseModal = ({
   const hasCreem = enableCreemTopUp && !!plan?.creem_product_id;
   const hasEpay = enableOnlineTopUp && epayMethods.length > 0;
   const hasAnyPayment = hasStripe || hasCreem || hasEpay;
-  const purchaseLimit = Number(purchaseLimitInfo?.limit || 0);
-  const purchaseCount = Number(purchaseLimitInfo?.count || 0);
+  const perUserLimit = Number(purchaseLimitInfo?.perUserLimit || 0);
+  const perUserCount = Number(purchaseLimitInfo?.perUserCount || 0);
+  const totalLimit = Number(purchaseLimitInfo?.totalLimit || 0);
+  const totalCount = Number(purchaseLimitInfo?.totalCount || 0);
   const purchaseLimitReached =
-    purchaseLimit > 0 && purchaseCount >= purchaseLimit;
+    perUserLimit > 0 && perUserCount >= perUserLimit;
+  const totalLimitReached = totalLimit > 0 && totalCount >= totalLimit;
 
   return (
     <Modal
@@ -156,6 +159,26 @@ const SubscriptionPurchaseModal = ({
                   </Text>
                 </div>
               ) : null}
+              {perUserLimit > 0 ? (
+                <div className='flex justify-between items-center'>
+                  <Text strong className='text-slate-700 dark:text-slate-200'>
+                    {t('每用户限购')}：
+                  </Text>
+                  <Text className='text-slate-900 dark:text-slate-100'>
+                    {perUserCount}/{perUserLimit}
+                  </Text>
+                </div>
+              ) : null}
+              {totalLimit > 0 ? (
+                <div className='flex justify-between items-center'>
+                  <Text strong className='text-slate-700 dark:text-slate-200'>
+                    {t('总量限购')}：
+                  </Text>
+                  <Text className='text-slate-900 dark:text-slate-100'>
+                    {totalCount}/{totalLimit}
+                  </Text>
+                </div>
+              ) : null}
               <Divider margin={8} />
               <div className='flex justify-between items-center'>
                 <Text strong className='text-slate-700 dark:text-slate-200'>
@@ -170,14 +193,21 @@ const SubscriptionPurchaseModal = ({
           </Card>
 
           {/* 支付方式 */}
-          {purchaseLimitReached && (
+          {totalLimitReached ? (
             <Banner
-              type='warning'
-              description={`${t('已达到购买上限')} (${purchaseCount}/${purchaseLimit})`}
+              type='danger'
+              description={`${t('该套餐已售罄')} (${totalCount}/${totalLimit})`}
               className='!rounded-xl'
               closeIcon={null}
             />
-          )}
+          ) : purchaseLimitReached ? (
+            <Banner
+              type='warning'
+              description={`${t('已达到购买上限')} (${perUserCount}/${perUserLimit})`}
+              className='!rounded-xl'
+              closeIcon={null}
+            />
+          ) : null}
 
           {hasAnyPayment ? (
             <div className='space-y-3'>
@@ -195,7 +225,7 @@ const SubscriptionPurchaseModal = ({
                       icon={<SiStripe size={14} color='#635BFF' />}
                       onClick={onPayStripe}
                       loading={paying}
-                      disabled={purchaseLimitReached}
+                      disabled={purchaseLimitReached || totalLimitReached}
                     >
                       Stripe
                     </Button>
@@ -207,7 +237,7 @@ const SubscriptionPurchaseModal = ({
                       icon={<IconCreditCard />}
                       onClick={onPayCreem}
                       loading={paying}
-                      disabled={purchaseLimitReached}
+                      disabled={purchaseLimitReached || totalLimitReached}
                     >
                       Creem
                     </Button>
@@ -228,14 +258,18 @@ const SubscriptionPurchaseModal = ({
                       value: m.type,
                       label: m.name || m.type,
                     }))}
-                    disabled={purchaseLimitReached}
+                    disabled={purchaseLimitReached || totalLimitReached}
                   />
                   <Button
                     theme='solid'
                     type='primary'
                     onClick={onPayEpay}
                     loading={paying}
-                    disabled={!selectedEpayMethod || purchaseLimitReached}
+                    disabled={
+                      !selectedEpayMethod ||
+                      purchaseLimitReached ||
+                      totalLimitReached
+                    }
                   >
                     {t('支付')}
                   </Button>

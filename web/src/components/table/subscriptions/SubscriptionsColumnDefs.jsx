@@ -91,12 +91,20 @@ const renderPlanTitle = (text, record, t) => {
         )}
         <Text type='tertiary'>{t('升级分组')}</Text>
         <Text>{plan?.upgrade_group ? plan.upgrade_group : t('不升级')}</Text>
-        <Text type='tertiary'>{t('购买上限')}</Text>
+        <Text type='tertiary'>{t('每用户限购')}</Text>
         <Text>
           {plan?.max_purchase_per_user > 0
             ? plan.max_purchase_per_user
             : t('不限')}
         </Text>
+        <Text type='tertiary'>{t('总可售数量')}</Text>
+        <Text>
+          {plan?.total_purchase_limit > 0
+            ? plan.total_purchase_limit
+            : t('不限')}
+        </Text>
+        <Text type='tertiary'>{t('总销量')}</Text>
+        <Text>{Number(record?.total_purchase_count || 0)}</Text>
         <Text type='tertiary'>{t('有效期')}</Text>
         <Text>{formatDuration(plan, t)}</Text>
         <Text type='tertiary'>{t('重置')}</Text>
@@ -140,6 +148,19 @@ const renderPurchaseLimit = (text, record, t) => {
       {limit > 0 ? limit : t('不限')}
     </Text>
   );
+};
+
+const renderTotalPurchaseLimit = (text, record, t) => {
+  const limit = Number(record?.plan?.total_purchase_limit || 0);
+  return (
+    <Text type={limit > 0 ? 'secondary' : 'tertiary'}>
+      {limit > 0 ? limit : t('不限')}
+    </Text>
+  );
+};
+
+const renderTotalPurchaseCount = (text, record) => {
+  return <Text type='secondary'>{Number(record?.total_purchase_count || 0)}</Text>;
 };
 
 const renderDuration = (text, record, t) => {
@@ -303,9 +324,19 @@ export const getSubscriptionsColumns = ({
       render: (text) => renderPrice(text),
     },
     {
-      title: t('购买上限'),
+      title: t('每用户限购'),
       width: 90,
       render: (text, record) => renderPurchaseLimit(text, record, t),
+    },
+    {
+      title: t('总可售数量'),
+      width: 100,
+      render: (text, record) => renderTotalPurchaseLimit(text, record, t),
+    },
+    {
+      title: t('总销量'),
+      width: 90,
+      render: (text, record) => renderTotalPurchaseCount(text, record),
     },
     {
       title: t('优先级'),

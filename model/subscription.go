@@ -165,6 +165,9 @@ type SubscriptionPlan struct {
 	// Max purchases per user (0 = unlimited)
 	MaxPurchasePerUser int `json:"max_purchase_per_user" gorm:"type:int;default:0"`
 
+	// Max total purchases across all users (0 = unlimited)
+	TotalPurchaseLimit int `json:"total_purchase_limit" gorm:"type:int;default:0"`
+
 	// Upgrade user group after purchase (empty = no change)
 	UpgradeGroup string `json:"upgrade_group" gorm:"type:varchar(64);default:''"`
 
@@ -264,6 +267,42 @@ func (s *UserSubscription) BeforeCreate(tx *gorm.DB) error {
 func (s *UserSubscription) BeforeUpdate(tx *gorm.DB) error {
 	s.UpdatedAt = common.GetTimestamp()
 	return nil
+}
+
+type subscriptionPlanPurchaseCountRow struct {
+	PlanId             int   `gorm:"column:plan_id"`
+	PurchaseUserCount  int64 `gorm:"column:purchase_user_count"`
+	TotalPurchaseCount int64 `gorm:"column:total_purchase_count"`
+}
+
+type SubscriptionPlanStats struct {
+	PurchaseUserCount  int64
+	TotalPurchaseCount int64
+}
+
+func GetSubscriptionPlanStats(planIds []int) (map[int]SubscriptionPlanStats, error) {
+	stats := make(map[int]SubscriptionPlanStats, len(planIds))
+	if len(planIds) == 0 {
+		return stats, nil
+	}
+
+	rows := make([]subscriptionPlanPurchaseCountRow, 0, len(planIds))
+	err := DB.Model(&UserSubscription{}).
+		Select("plan_id, COUNT(DISTINCT user_id) AS purchase_user_count, COUNT(*) AS total_purchase_count").
+		Where("plan_id IN ?", planIds).
+		Group("plan_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows {
+		stats[row.PlanId] = SubscriptionPlanStats{
+			PurchaseUserCount:  row.PurchaseUserCount,
+			TotalPurchaseCount: row.TotalPurchaseCount,
+		}
+	}
+	return stats, nil
 }
 
 type SubscriptionSummary struct {
@@ -385,6 +424,19 @@ func CountUserSubscriptionsByPlan(userId int, planId int) (int64, error) {
 	return count, nil
 }
 
+func CountSubscriptionsByPlan(planId int) (int64, error) {
+	if planId <= 0 {
+		return 0, errors.New("invalid planId")
+	}
+	var count int64
+	if err := DB.Model(&UserSubscription{}).
+		Where("plan_id = ?", planId).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func getUserGroupByIdTx(tx *gorm.DB, userId int) (string, error) {
 	if userId <= 0 {
 		return "", errors.New("invalid userId")
@@ -453,6 +505,17 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 		}
 		if count >= int64(plan.MaxPurchasePerUser) {
 			return nil, errors.New("已达到该套餐购买上限")
+		}
+	}
+	if plan.TotalPurchaseLimit > 0 {
+		var count int64
+		if err := tx.Model(&UserSubscription{}).
+			Where("plan_id = ?", plan.Id).
+			Count(&count).Error; err != nil {
+			return nil, err
+		}
+		if count >= int64(plan.TotalPurchaseLimit) {
+			return nil, errors.New("该套餐已售罄")
 		}
 	}
 	nowUnix := GetDBTimestamp()

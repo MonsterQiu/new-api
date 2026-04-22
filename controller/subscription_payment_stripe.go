@@ -71,6 +71,17 @@ func SubscriptionRequestStripePay(c *gin.Context) {
 			return
 		}
 	}
+	if plan.TotalPurchaseLimit > 0 {
+		count, err := model.CountSubscriptionsByPlan(plan.Id)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		if count >= int64(plan.TotalPurchaseLimit) {
+			common.ApiErrorMsg(c, "该套餐已售罄")
+			return
+		}
+	}
 
 	reference := fmt.Sprintf("sub-stripe-ref-%d-%d-%s", user.Id, time.Now().UnixMilli(), randstr.String(4))
 	referenceId := "sub_ref_" + common.Sha1([]byte(reference))

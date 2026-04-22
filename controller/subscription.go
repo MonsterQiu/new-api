@@ -14,7 +14,9 @@ import (
 // ---- Shared types ----
 
 type SubscriptionPlanDTO struct {
-	Plan model.SubscriptionPlan `json:"plan"`
+	Plan               model.SubscriptionPlan `json:"plan"`
+	PurchaseUserCount  int64                  `json:"purchase_user_count"`
+	TotalPurchaseCount int64                  `json:"total_purchase_count"`
 }
 
 type BillingPreferenceRequest struct {
@@ -29,10 +31,21 @@ func GetSubscriptionPlans(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	planIds := make([]int, 0, len(plans))
+	for _, p := range plans {
+		planIds = append(planIds, p.Id)
+	}
+	stats, err := model.GetSubscriptionPlanStats(planIds)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	result := make([]SubscriptionPlanDTO, 0, len(plans))
 	for _, p := range plans {
 		result = append(result, SubscriptionPlanDTO{
-			Plan: p,
+			Plan:               p,
+			PurchaseUserCount:  stats[p.Id].PurchaseUserCount,
+			TotalPurchaseCount: stats[p.Id].TotalPurchaseCount,
 		})
 	}
 	common.ApiSuccess(c, result)
@@ -94,10 +107,21 @@ func AdminListSubscriptionPlans(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	planIds := make([]int, 0, len(plans))
+	for _, p := range plans {
+		planIds = append(planIds, p.Id)
+	}
+	stats, err := model.GetSubscriptionPlanStats(planIds)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	result := make([]SubscriptionPlanDTO, 0, len(plans))
 	for _, p := range plans {
 		result = append(result, SubscriptionPlanDTO{
-			Plan: p,
+			Plan:               p,
+			PurchaseUserCount:  stats[p.Id].PurchaseUserCount,
+			TotalPurchaseCount: stats[p.Id].TotalPurchaseCount,
 		})
 	}
 	common.ApiSuccess(c, result)
@@ -138,6 +162,10 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 	}
 	if req.Plan.MaxPurchasePerUser < 0 {
 		common.ApiErrorMsg(c, "购买上限不能为负数")
+		return
+	}
+	if req.Plan.TotalPurchaseLimit < 0 {
+		common.ApiErrorMsg(c, "总量上限不能为负数")
 		return
 	}
 	if req.Plan.TotalAmount < 0 {
@@ -203,6 +231,10 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorMsg(c, "购买上限不能为负数")
 		return
 	}
+	if req.Plan.TotalPurchaseLimit < 0 {
+		common.ApiErrorMsg(c, "总量上限不能为负数")
+		return
+	}
 	if req.Plan.TotalAmount < 0 {
 		common.ApiErrorMsg(c, "总额度不能为负数")
 		return
@@ -235,6 +267,7 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 			"stripe_price_id":            req.Plan.StripePriceId,
 			"creem_product_id":           req.Plan.CreemProductId,
 			"max_purchase_per_user":      req.Plan.MaxPurchasePerUser,
+			"total_purchase_limit":       req.Plan.TotalPurchaseLimit,
 			"total_amount":               req.Plan.TotalAmount,
 			"upgrade_group":              req.Plan.UpgradeGroup,
 			"quota_reset_period":         req.Plan.QuotaResetPeriod,

@@ -92,7 +92,10 @@ const AddEditSubscriptionModal = ({
     quota_reset_custom_seconds: 0,
     enabled: true,
     sort_order: 0,
+    enable_purchase_limit: false,
     max_purchase_per_user: 0,
+    enable_total_purchase_limit: false,
+    total_purchase_limit: 0,
     total_amount: 0,
     upgrade_group: '',
     stripe_price_id: '',
@@ -116,7 +119,10 @@ const AddEditSubscriptionModal = ({
       quota_reset_custom_seconds: Number(p.quota_reset_custom_seconds || 0),
       enabled: p.enabled !== false,
       sort_order: Number(p.sort_order || 0),
+      enable_purchase_limit: Number(p.max_purchase_per_user || 0) > 0,
       max_purchase_per_user: Number(p.max_purchase_per_user || 0),
+      enable_total_purchase_limit: Number(p.total_purchase_limit || 0) > 0,
+      total_purchase_limit: Number(p.total_purchase_limit || 0),
       total_amount: Number(
         quotaToDisplayAmount(p.total_amount || 0).toFixed(2),
       ),
@@ -141,16 +147,43 @@ const AddEditSubscriptionModal = ({
       .finally(() => setGroupLoading(false));
   }, [visible]);
 
+  const ensureMinimumLimitValue = (field, enabled) => {
+    if (!enabled) return;
+    const currentValue = Number(formApiRef.current?.getValue(field) || 0);
+    if (currentValue < 1) {
+      formApiRef.current?.setValue(field, 1);
+    }
+  };
+
   const submit = async (values) => {
     if (!values.title || values.title.trim() === '') {
       showError(t('套餐标题不能为空'));
       return;
     }
+    if (
+      values.enable_purchase_limit &&
+      Number(values.max_purchase_per_user || 0) < 1
+    ) {
+      showError(t('启用每用户限购时，限购数量必须大于等于 1'));
+      return;
+    }
+    if (
+      values.enable_total_purchase_limit &&
+      Number(values.total_purchase_limit || 0) < 1
+    ) {
+      showError(t('启用总量限购时，总可售数量必须大于等于 1'));
+      return;
+    }
     setLoading(true);
     try {
+      const {
+        enable_purchase_limit,
+        enable_total_purchase_limit,
+        ...restValues
+      } = values;
       const payload = {
         plan: {
-          ...values,
+          ...restValues,
           price_amount: Number(values.price_amount || 0),
           currency: 'USD',
           duration_value: Number(values.duration_value || 0),
@@ -161,7 +194,12 @@ const AddEditSubscriptionModal = ({
               ? Number(values.quota_reset_custom_seconds || 0)
               : 0,
           sort_order: Number(values.sort_order || 0),
-          max_purchase_per_user: Number(values.max_purchase_per_user || 0),
+          max_purchase_per_user: enable_purchase_limit
+            ? Number(values.max_purchase_per_user || 0)
+            : 0,
+          total_purchase_limit: enable_total_purchase_limit
+            ? Number(values.total_purchase_limit || 0)
+            : 0,
           total_amount: displayAmountToQuota(values.total_amount),
           upgrade_group: values.upgrade_group || '',
         },
@@ -361,12 +399,61 @@ const AddEditSubscriptionModal = ({
                     </Col>
 
                     <Col span={12}>
+                      <Form.Switch
+                        field='enable_purchase_limit'
+                        label={t('启用每用户限购')}
+                        size='large'
+                        onChange={(checked) =>
+                          ensureMinimumLimitValue(
+                            'max_purchase_per_user',
+                            checked,
+                          )
+                        }
+                      />
+                    </Col>
+
+                    <Col span={12}>
                       <Form.InputNumber
                         field='max_purchase_per_user'
-                        label={t('购买上限')}
-                        min={0}
+                        label={t('每用户限购')}
+                        min={1}
                         precision={0}
-                        extraText={t('0 表示不限')}
+                        disabled={!values.enable_purchase_limit}
+                        extraText={
+                          values.enable_purchase_limit
+                            ? t('每个用户最多可购买的次数')
+                            : t('关闭后为不限制每用户购买次数')
+                        }
+                        style={{ width: '100%' }}
+                      />
+                    </Col>
+
+                    <Col span={12}>
+                      <Form.Switch
+                        field='enable_total_purchase_limit'
+                        label={t('启用总量限购')}
+                        size='large'
+                        onChange={(checked) =>
+                          ensureMinimumLimitValue(
+                            'total_purchase_limit',
+                            checked,
+                          )
+                        }
+                      />
+                    </Col>
+
+                    <Col span={12}>
+                      <Form.InputNumber
+                        field='total_purchase_limit'
+                        label={t('总可售数量')}
+                        min={1}
+                        precision={0}
+                        disabled={!values.enable_total_purchase_limit}
+                        extraText={
+                          values.enable_total_purchase_limit
+                            ? t('该套餐最多可成功售出的总份数')
+                            : t('关闭后为不限制总销量')
+                        }
                         style={{ width: '100%' }}
                       />
                     </Col>

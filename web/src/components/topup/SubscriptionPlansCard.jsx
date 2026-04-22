@@ -212,7 +212,7 @@ const SubscriptionPlansCard = ({
   const subscriptionPreferenceLabel =
     billingPreference === 'subscription_only' ? t('仅用订阅') : t('优先订阅');
 
-  const planPurchaseCountMap = useMemo(() => {
+  const userPlanPurchaseCountMap = useMemo(() => {
     const map = new Map();
     (allSubscriptions || []).forEach((sub) => {
       const planId = sub?.subscription?.plan_id;
@@ -232,8 +232,8 @@ const SubscriptionPlansCard = ({
     return map;
   }, [plans]);
 
-  const getPlanPurchaseCount = (planId) =>
-    planPurchaseCountMap.get(planId) || 0;
+  const getUserPlanPurchaseCount = (planId) =>
+    userPlanPurchaseCountMap.get(planId) || 0;
 
   // 计算单个订阅的剩余天数
   const getRemainingDays = (sub) => {
@@ -267,7 +267,7 @@ const SubscriptionPlansCard = ({
             </div>
           </Card>
           {/* 套餐列表骨架屏 */}
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-5 w-full px-1'>
+          <div className='grid grid-cols-1 gap-4 w-full px-1'>
             {[1, 2, 3].map((i) => (
               <Card
                 key={i}
@@ -486,9 +486,11 @@ const SubscriptionPlansCard = ({
 
           {/* 可购买套餐 - 标准定价卡片 */}
           {plans.length > 0 ? (
-            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-5 w-full px-1'>
+            <div className='grid grid-cols-1 gap-4 w-full px-1'>
               {plans.map((p, index) => {
                 const plan = p?.plan;
+                const purchaseUserCount = Number(p?.purchase_user_count || 0);
+                const totalPurchaseCount = Number(p?.total_purchase_count || 0);
                 const totalAmount = Number(plan?.total_amount || 0);
                 const { symbol, rate } = getCurrencyConfig();
                 const price = Number(plan?.price_amount || 0);
@@ -498,7 +500,20 @@ const SubscriptionPlansCard = ({
                 );
                 const isPopular = index === 0 && plans.length > 1;
                 const limit = Number(plan?.max_purchase_per_user || 0);
-                const limitLabel = limit > 0 ? `${t('限购')} ${limit}` : null;
+                const totalPurchaseLimit = Number(plan?.total_purchase_limit || 0);
+                const soldOut =
+                  totalPurchaseLimit > 0 &&
+                  totalPurchaseCount >= totalPurchaseLimit;
+                const remainingCount =
+                  totalPurchaseLimit > 0
+                    ? Math.max(totalPurchaseLimit - totalPurchaseCount, 0)
+                    : 0;
+                const limitLabel =
+                  limit > 0 ? `${t('每用户限购')}: ${limit}` : null;
+                const totalPurchaseLabel =
+                  totalPurchaseLimit > 0
+                    ? `${t('总量限购')}: ${totalPurchaseCount}/${totalPurchaseLimit}`
+                    : null;
                 const totalLabel =
                   totalAmount > 0
                     ? `${t('总额度')}: ${renderQuota(totalAmount)}`
@@ -521,6 +536,7 @@ const SubscriptionPlansCard = ({
                         tooltip: `${t('原生额度')}：${totalAmount}`,
                       }
                     : { label: totalLabel },
+                  totalPurchaseLabel ? { label: totalPurchaseLabel } : null,
                   limitLabel ? { label: limitLabel } : null,
                   upgradeLabel ? { label: upgradeLabel } : null,
                 ].filter(Boolean);
@@ -546,7 +562,7 @@ const SubscriptionPlansCard = ({
                       {/* 套餐名称 */}
                       <div className='mb-3'>
                         <Typography.Title
-                          heading={5}
+                          heading={4}
                           ellipsis={{ rows: 1, showTooltip: true }}
                           style={{ margin: 0 }}
                         >
@@ -554,14 +570,46 @@ const SubscriptionPlansCard = ({
                         </Typography.Title>
                         {plan?.subtitle && (
                           <Text
-                            type='tertiary'
-                            size='small'
-                            ellipsis={{ rows: 1, showTooltip: true }}
-                            style={{ display: 'block' }}
+                            type='secondary'
+                            style={{
+                              display: 'block',
+                              marginTop: 8,
+                              fontSize: 14,
+                              lineHeight: '22px',
+                              fontWeight: 500,
+                              color: 'var(--semi-color-text-1)',
+                              opacity: 0.92,
+                            }}
                           >
                             {plan.subtitle}
                           </Text>
                         )}
+                        <div className='mt-2 flex flex-wrap items-center gap-2'>
+                          <Tag color='cyan' shape='circle' size='small'>
+                            {t('购买人数 {{count}}', {
+                              count: purchaseUserCount,
+                            })}
+                          </Tag>
+                          {limit > 0 && (
+                            <Tag color='orange' shape='circle' size='small'>
+                              {`${t('每用户限购')} ${limit}`}
+                            </Tag>
+                          )}
+                          {totalPurchaseLimit > 0 && (
+                            <Tag
+                              color={soldOut ? 'red' : 'light-green'}
+                              shape='circle'
+                              size='small'
+                            >
+                              {soldOut
+                                ? t('已售罄')
+                                : t('剩余 {{count}} / {{limit}}', {
+                                    count: remainingCount,
+                                    limit: totalPurchaseLimit,
+                                  })}
+                            </Tag>
+                          )}
+                        </div>
                       </div>
 
                       {/* 价格区域 */}
@@ -610,25 +658,32 @@ const SubscriptionPlansCard = ({
 
                         {/* 购买按钮 */}
                         {(() => {
-                          const count = getPlanPurchaseCount(p?.plan?.id);
+                          const count = getUserPlanPurchaseCount(p?.plan?.id);
                           const reached = limit > 0 && count >= limit;
-                          const tip = reached
-                            ? t('已达到购买上限') + ` (${count}/${limit})`
-                            : '';
+                          const disabled = soldOut || reached;
+                          const tip = soldOut
+                            ? `${t('该套餐已售罄')} (${totalPurchaseCount}/${totalPurchaseLimit})`
+                            : reached
+                              ? t('已达到购买上限') + ` (${count}/${limit})`
+                              : '';
                           const buttonEl = (
                             <Button
                               theme='outline'
                               type='primary'
                               block
-                              disabled={reached}
+                              disabled={disabled}
                               onClick={() => {
-                                if (!reached) openBuy(p);
+                                if (!disabled) openBuy(p);
                               }}
                             >
-                              {reached ? t('已达上限') : t('立即订阅')}
+                              {soldOut
+                                ? t('已售罄')
+                                : reached
+                                  ? t('已达上限')
+                                  : t('立即订阅')}
                             </Button>
                           );
-                          return reached ? (
+                          return disabled ? (
                             <Tooltip content={tip} position='top'>
                               {buttonEl}
                             </Tooltip>
@@ -676,8 +731,14 @@ const SubscriptionPlansCard = ({
         purchaseLimitInfo={
           selectedPlan?.plan?.id
             ? {
-                limit: Number(selectedPlan?.plan?.max_purchase_per_user || 0),
-                count: getPlanPurchaseCount(selectedPlan?.plan?.id),
+                perUserLimit: Number(
+                  selectedPlan?.plan?.max_purchase_per_user || 0,
+                ),
+                perUserCount: getUserPlanPurchaseCount(selectedPlan?.plan?.id),
+                totalLimit: Number(
+                  selectedPlan?.plan?.total_purchase_limit || 0,
+                ),
+                totalCount: Number(selectedPlan?.total_purchase_count || 0),
               }
             : null
         }
