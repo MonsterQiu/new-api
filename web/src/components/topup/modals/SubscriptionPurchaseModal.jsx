@@ -32,11 +32,14 @@ import { Crown, CalendarClock, Package } from 'lucide-react';
 import { SiStripe } from 'react-icons/si';
 import { IconCreditCard } from '@douyinfe/semi-icons';
 import { renderQuota } from '../../../helpers';
-import { getCurrencyConfig } from '../../../helpers/render';
 import {
   formatSubscriptionDuration,
   formatSubscriptionResetPeriod,
 } from '../../../helpers/subscriptionFormat';
+import {
+  getGroupedSubscriptionPaymentOptions,
+  getSubscriptionPaymentOptions,
+} from '../../../helpers/subscriptionPayment';
 
 const { Text } = Typography;
 
@@ -59,23 +62,36 @@ const SubscriptionPurchaseModal = ({
 }) => {
   const plan = selectedPlan?.plan;
   const totalAmount = Number(plan?.total_amount || 0);
-  const { symbol, rate } = getCurrencyConfig();
-  const price = plan ? Number(plan.price_amount || 0) : 0;
-  const convertedPrice = price * rate;
-  const displayPrice = convertedPrice.toFixed(
-    Number.isInteger(convertedPrice) ? 0 : 2,
-  );
   // 只有当管理员开启支付网关 AND 套餐配置了对应的支付ID时才显示
   const hasStripe = enableStripeTopUp && !!plan?.stripe_price_id;
   const hasCreem = enableCreemTopUp && !!plan?.creem_product_id;
   const hasEpay = enableOnlineTopUp && epayMethods.length > 0;
   const hasAnyPayment = hasStripe || hasCreem || hasEpay;
+  const paymentOptionInput = {
+    plan,
+    enableOnlineTopUp,
+    enableStripeTopUp,
+    enableCreemTopUp,
+    epayMethods,
+    epayLabel: t('易支付'),
+  };
+  const paymentOptions = getSubscriptionPaymentOptions(paymentOptionInput);
+  const groupedPaymentOptions =
+    getGroupedSubscriptionPaymentOptions(paymentOptionInput);
+  const stripePaymentOption = paymentOptions.find(
+    (option) => option.key === 'stripe',
+  );
+  const creemPaymentOption = paymentOptions.find(
+    (option) => option.key === 'creem',
+  );
+  const epayPaymentOption = paymentOptions.find(
+    (option) => option.key === 'epay',
+  );
   const perUserLimit = Number(purchaseLimitInfo?.perUserLimit || 0);
   const perUserCount = Number(purchaseLimitInfo?.perUserCount || 0);
   const totalLimit = Number(purchaseLimitInfo?.totalLimit || 0);
   const totalCount = Number(purchaseLimitInfo?.totalCount || 0);
-  const purchaseLimitReached =
-    perUserLimit > 0 && perUserCount >= perUserLimit;
+  const purchaseLimitReached = perUserLimit > 0 && perUserCount >= perUserLimit;
   const totalLimitReached = totalLimit > 0 && totalCount >= totalLimit;
 
   return (
@@ -184,10 +200,24 @@ const SubscriptionPurchaseModal = ({
                 <Text strong className='text-slate-700 dark:text-slate-200'>
                   {t('应付金额')}：
                 </Text>
-                <Text strong className='text-xl text-purple-600'>
-                  {symbol}
-                  {displayPrice}
-                </Text>
+                {groupedPaymentOptions.length > 1 ? (
+                  <div className='flex flex-col items-end gap-1'>
+                    {groupedPaymentOptions.map((paymentOption) => (
+                      <Text
+                        key={`${paymentOption.currency}-${paymentOption.formattedAmount}-${paymentOption.label}`}
+                        strong
+                        className='text-base text-purple-600'
+                      >
+                        {paymentOption.label ? `${paymentOption.label} ` : ''}
+                        {paymentOption.displayPrice}
+                      </Text>
+                    ))}
+                  </div>
+                ) : (
+                  <Text strong className='text-xl text-purple-600'>
+                    {groupedPaymentOptions[0]?.displayPrice}
+                  </Text>
+                )}
               </div>
             </div>
           </Card>
@@ -227,7 +257,7 @@ const SubscriptionPurchaseModal = ({
                       loading={paying}
                       disabled={purchaseLimitReached || totalLimitReached}
                     >
-                      Stripe
+                      {`Stripe${stripePaymentOption ? ` (${stripePaymentOption.displayPrice})` : ''}`}
                     </Button>
                   )}
                   {hasCreem && (
@@ -239,7 +269,7 @@ const SubscriptionPurchaseModal = ({
                       loading={paying}
                       disabled={purchaseLimitReached || totalLimitReached}
                     >
-                      Creem
+                      {`Creem${creemPaymentOption ? ` (${creemPaymentOption.displayPrice})` : ''}`}
                     </Button>
                   )}
                 </div>
@@ -271,7 +301,9 @@ const SubscriptionPurchaseModal = ({
                       totalLimitReached
                     }
                   >
-                    {t('支付')}
+                    {epayPaymentOption
+                      ? `${t('支付')} ${epayPaymentOption.displayPrice}`
+                      : t('支付')}
                   </Button>
                 </div>
               )}

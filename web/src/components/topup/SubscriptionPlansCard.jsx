@@ -31,13 +31,13 @@ import {
   Typography,
 } from '@douyinfe/semi-ui';
 import { API, showError, showSuccess, renderQuota } from '../../helpers';
-import { getCurrencyConfig } from '../../helpers/render';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import SubscriptionPurchaseModal from './modals/SubscriptionPurchaseModal';
 import {
   formatSubscriptionDuration,
   formatSubscriptionResetPeriod,
 } from '../../helpers/subscriptionFormat';
+import { getGroupedSubscriptionPaymentOptions } from '../../helpers/subscriptionPayment';
 
 const { Text } = Typography;
 
@@ -492,15 +492,20 @@ const SubscriptionPlansCard = ({
                 const purchaseUserCount = Number(p?.purchase_user_count || 0);
                 const totalPurchaseCount = Number(p?.total_purchase_count || 0);
                 const totalAmount = Number(plan?.total_amount || 0);
-                const { symbol, rate } = getCurrencyConfig();
-                const price = Number(plan?.price_amount || 0);
-                const convertedPrice = price * rate;
-                const displayPrice = convertedPrice.toFixed(
-                  Number.isInteger(convertedPrice) ? 0 : 2,
-                );
+                const paymentDisplays = getGroupedSubscriptionPaymentOptions({
+                  plan,
+                  enableOnlineTopUp,
+                  enableStripeTopUp,
+                  enableCreemTopUp,
+                  epayMethods,
+                  epayLabel: t('易支付'),
+                });
+                const primaryPaymentDisplay = paymentDisplays[0];
                 const isPopular = index === 0 && plans.length > 1;
                 const limit = Number(plan?.max_purchase_per_user || 0);
-                const totalPurchaseLimit = Number(plan?.total_purchase_limit || 0);
+                const totalPurchaseLimit = Number(
+                  plan?.total_purchase_limit || 0,
+                );
                 const soldOut =
                   totalPurchaseLimit > 0 &&
                   totalPurchaseCount >= totalPurchaseLimit;
@@ -614,14 +619,48 @@ const SubscriptionPlansCard = ({
 
                       {/* 价格区域 */}
                       <div className='py-2'>
-                        <div className='flex items-baseline justify-start'>
-                          <span className='text-xl font-bold text-purple-600'>
-                            {symbol}
-                          </span>
-                          <span className='text-3xl font-bold text-purple-600'>
-                            {displayPrice}
-                          </span>
-                        </div>
+                        {paymentDisplays.length > 1 ? (
+                          <div className='space-y-2'>
+                            {paymentDisplays.map((paymentDisplay) => (
+                              <div
+                                key={`${plan?.id}-${paymentDisplay.currency}-${paymentDisplay.formattedAmount}-${paymentDisplay.label}`}
+                                className='flex items-center justify-between gap-3 rounded-lg bg-slate-50/80 px-3 py-2 dark:bg-slate-800/80'
+                              >
+                                <Text type='secondary' size='small'>
+                                  {paymentDisplay.label}
+                                </Text>
+                                <div className='flex items-baseline gap-1'>
+                                  <span className='text-base font-bold text-purple-600'>
+                                    {paymentDisplay.symbol}
+                                  </span>
+                                  <span className='text-2xl font-bold text-purple-600'>
+                                    {paymentDisplay.formattedAmount}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div>
+                            <div className='flex items-baseline justify-start'>
+                              <span className='text-xl font-bold text-purple-600'>
+                                {primaryPaymentDisplay?.symbol}
+                              </span>
+                              <span className='text-3xl font-bold text-purple-600'>
+                                {primaryPaymentDisplay?.formattedAmount}
+                              </span>
+                            </div>
+                            {primaryPaymentDisplay?.label ? (
+                              <Text
+                                type='tertiary'
+                                size='small'
+                                style={{ display: 'block', marginTop: 6 }}
+                              >
+                                {primaryPaymentDisplay.label}
+                              </Text>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
 
                       {/* 套餐权益描述 */}
