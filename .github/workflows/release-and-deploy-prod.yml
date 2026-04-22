@@ -16,7 +16,7 @@ jobs:
       packages: write
 
     env:
-      DEPLOY_DIR: /root/new-api-deploy
+      DEPLOY_DIR: /opt/new-api-deploy
 
     steps:
       - name: Checkout

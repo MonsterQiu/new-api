@@ -162,7 +162,7 @@ docker-compose --env-file deploy/.env.prod -f deploy/compose.prod.yml up -d new-
 第一次把脚本同步到服务器：
 
 ```bash
-cd /root/new-api-deploy
+cd /opt/new-api-deploy
 git pull origin main
 chmod +x deploy/remote-deploy-prod.sh
 ```
@@ -179,7 +179,7 @@ chmod +x deploy/remote-deploy-prod.sh
 
 - 构建 `ghcr.io/<owner>/<repo>:<tag>`
 - SSH 到生产服务器
-- 更新 `/root/new-api-deploy/deploy/.env.prod` 里的 `NEW_API_IMAGE`
+- 更新 `/opt/new-api-deploy/deploy/.env.prod` 里的 `NEW_API_IMAGE`
 - 重启 `new-api`
 
 ## Caddy 建议
