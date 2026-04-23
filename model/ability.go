@@ -104,6 +104,10 @@ func getChannelQuery(group string, model string, retry int) (*gorm.DB, error) {
 }
 
 func GetChannel(group string, model string, retry int) (*Channel, error) {
+	return GetChannelWithExcluded(group, model, retry, nil)
+}
+
+func GetChannelWithExcluded(group string, model string, retry int, excludedIDs map[int]struct{}) (*Channel, error) {
 	var abilities []Ability
 
 	var err error = nil
@@ -120,24 +124,34 @@ func GetChannel(group string, model string, retry int) (*Channel, error) {
 		return nil, err
 	}
 	channel := Channel{}
-	if len(abilities) > 0 {
-		// Randomly choose one
-		weightSum := uint(0)
+	if len(excludedIDs) > 0 {
+		filtered := make([]Ability, 0, len(abilities))
 		for _, ability_ := range abilities {
-			weightSum += ability_.Weight + 10
-		}
-		// Randomly choose one
-		weight := common.GetRandomInt(int(weightSum))
-		for _, ability_ := range abilities {
-			weight -= int(ability_.Weight) + 10
-			//log.Printf("weight: %d, ability weight: %d", weight, *ability_.Weight)
-			if weight <= 0 {
-				channel.Id = ability_.ChannelId
-				break
+			if _, excluded := excludedIDs[ability_.ChannelId]; excluded {
+				continue
 			}
+			filtered = append(filtered, ability_)
 		}
-	} else {
+		abilities = filtered
+	}
+	if len(abilities) == 0 {
 		return nil, nil
+	}
+
+	// Randomly choose one
+	weightSum := uint(0)
+	for _, ability_ := range abilities {
+		weightSum += ability_.Weight + 10
+	}
+	// Randomly choose one
+	weight := common.GetRandomInt(int(weightSum))
+	for _, ability_ := range abilities {
+		weight -= int(ability_.Weight) + 10
+		//log.Printf("weight: %d, ability weight: %d", weight, *ability_.Weight)
+		if weight <= 0 {
+			channel.Id = ability_.ChannelId
+			break
+		}
 	}
 	err = DB.First(&channel, "id = ?", channel.Id).Error
 	return &channel, err

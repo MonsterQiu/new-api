@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -58,6 +59,9 @@ func ShouldDisableChannel(channelType int, err *types.NewAPIError) bool {
 	if operation_setting.ShouldDisableByStatusCode(err.StatusCode) {
 		return true
 	}
+	if shouldDisableQuotaExhausted429(err) {
+		return true
+	}
 	//if err.StatusCode == http.StatusUnauthorized {
 	//	return true
 	//}
@@ -97,6 +101,40 @@ func ShouldDisableChannel(channelType int, err *types.NewAPIError) bool {
 	lowerMessage := strings.ToLower(err.Error())
 	search, _ := AcSearch(lowerMessage, operation_setting.AutomaticDisableKeywords, true)
 	return search
+}
+
+func shouldDisableQuotaExhausted429(err *types.NewAPIError) bool {
+	if err == nil || err.StatusCode != http.StatusTooManyRequests {
+		return false
+	}
+
+	oaiErr := err.ToOpenAIError()
+	code := strings.ToLower(fmt.Sprintf("%v", oaiErr.Code))
+	errType := strings.ToLower(strings.TrimSpace(oaiErr.Type))
+	if code == "insufficient_quota" || code == "billing_hard_limit_reached" {
+		return true
+	}
+	if errType == "insufficient_quota" {
+		return true
+	}
+
+	lowerMessage := strings.ToLower(err.Error())
+	quotaExhaustedIndicators := []string{
+		"usage limit has been reached",
+		"usage limit has been",
+		"reached your usage limit",
+		"exceeded your current quota",
+		"billing hard limit",
+		"credit balance is too low",
+		"insufficient quota",
+		"quota exceeded",
+	}
+	for _, indicator := range quotaExhaustedIndicators {
+		if strings.Contains(lowerMessage, indicator) {
+			return true
+		}
+	}
+	return false
 }
 
 func ShouldEnableChannel(newAPIError *types.NewAPIError, status int) bool {
