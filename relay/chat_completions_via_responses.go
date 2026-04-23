@@ -1,7 +1,9 @@
 package relay
 
 import (
+	"bufio"
 	"bytes"
+	"io"
 	"net/http"
 	"strings"
 
@@ -17,6 +19,27 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+func detectResponsesEventStream(resp *http.Response) bool {
+	if resp == nil || resp.Body == nil {
+		return false
+	}
+
+	contentType := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Type")))
+	if strings.HasPrefix(contentType, "text/event-stream") {
+		return true
+	}
+
+	reader := bufio.NewReader(resp.Body)
+	sample, err := reader.Peek(128)
+	resp.Body = io.NopCloser(reader)
+	if err != nil && err != io.EOF {
+		return false
+	}
+
+	prefix := strings.TrimSpace(string(sample))
+	return strings.HasPrefix(prefix, "event:") || strings.HasPrefix(prefix, "data:")
+}
 
 func applySystemPromptIfNeeded(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeneralOpenAIRequest) {
 	if info == nil || request == nil {
@@ -144,7 +167,7 @@ func chatCompletionsViaResponses(c *gin.Context, info *relaycommon.RelayInfo, ad
 	statusCodeMappingStr := c.GetString("status_code_mapping")
 
 	httpResp = resp.(*http.Response)
-	upstreamIsStream := strings.HasPrefix(httpResp.Header.Get("Content-Type"), "text/event-stream")
+	upstreamIsStream := detectResponsesEventStream(httpResp)
 	if httpResp.StatusCode != http.StatusOK {
 		newApiErr := service.RelayErrorHandler(c.Request.Context(), httpResp, false)
 		service.ResetStatusCode(newApiErr, statusCodeMappingStr)
