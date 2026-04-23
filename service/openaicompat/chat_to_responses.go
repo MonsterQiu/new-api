@@ -73,6 +73,27 @@ func convertChatResponseFormatToResponsesText(reqFormat *dto.ResponseFormat) jso
 	return textRaw
 }
 
+func buildResponsesTextContent(role string, text string) []map[string]any {
+	textType := "input_text"
+	if role == "assistant" {
+		textType = "output_text"
+	}
+	return []map[string]any{
+		{
+			"type": textType,
+			"text": text,
+		},
+	}
+}
+
+func buildResponsesMessageItem(role string, content any) map[string]any {
+	return map[string]any{
+		"type":    "message",
+		"role":    role,
+		"content": content,
+	}
+}
+
 func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*dto.OpenAIResponsesRequest, error) {
 	if req == nil {
 		return nil, errors.New("request is nil")
@@ -110,10 +131,10 @@ func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*d
 			}
 
 			if callID == "" {
-				inputItems = append(inputItems, map[string]any{
-					"role":    "user",
-					"content": fmt.Sprintf("[tool_output_missing_call_id] %v", output),
-				})
+				inputItems = append(inputItems, buildResponsesMessageItem(
+					"user",
+					buildResponsesTextContent("user", fmt.Sprintf("[tool_output_missing_call_id] %v", output)),
+				))
 				continue
 			}
 
@@ -152,39 +173,9 @@ func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*d
 			continue
 		}
 
-		item := map[string]any{
-			"role": role,
-		}
+		item := buildResponsesMessageItem(role, "")
 
 		if msg.Content == nil {
-			item["content"] = ""
-			inputItems = append(inputItems, item)
-
-			if role == "assistant" {
-				for _, tc := range msg.ParseToolCalls() {
-					if strings.TrimSpace(tc.ID) == "" {
-						continue
-					}
-					if tc.Type != "" && tc.Type != "function" {
-						continue
-					}
-					name := strings.TrimSpace(tc.Function.Name)
-					if name == "" {
-						continue
-					}
-					inputItems = append(inputItems, map[string]any{
-						"type":      "function_call",
-						"call_id":   tc.ID,
-						"name":      name,
-						"arguments": tc.Function.Arguments,
-					})
-				}
-			}
-			continue
-		}
-
-		if msg.IsStringContent() {
-			item["content"] = msg.StringContent()
 			inputItems = append(inputItems, item)
 
 			if role == "assistant" {
@@ -215,14 +206,7 @@ func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*d
 		for _, part := range parts {
 			switch part.Type {
 			case dto.ContentTypeText:
-				textType := "input_text"
-				if role == "assistant" {
-					textType = "output_text"
-				}
-				contentParts = append(contentParts, map[string]any{
-					"type": textType,
-					"text": part.Text,
-				})
+				contentParts = append(contentParts, buildResponsesTextContent(role, part.Text)...)
 			case dto.ContentTypeImageURL:
 				contentParts = append(contentParts, map[string]any{
 					"type":      "input_image",
@@ -248,6 +232,9 @@ func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*d
 					"type": part.Type,
 				})
 			}
+		}
+		if len(contentParts) == 0 && msg.IsStringContent() {
+			contentParts = buildResponsesTextContent(role, msg.StringContent())
 		}
 		item["content"] = contentParts
 		inputItems = append(inputItems, item)
