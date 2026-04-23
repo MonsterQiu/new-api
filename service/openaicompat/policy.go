@@ -22,19 +22,20 @@ func ResolveChatCompletionsToResponsesPolicy(
 	if !policy.IsChannelEnabled(channelID, channelType) {
 		return ChatCompletionsToResponsesDecision{}
 	}
-	if policy.OnlyNonStream && isStream {
-		return ChatCompletionsToResponsesDecision{}
-	}
-	if len(policy.Groups) > 0 && !matchAnyExact(policy.Groups, usingGroup) {
-		return ChatCompletionsToResponsesDecision{}
-	}
 	if !matchAnyRegex(policy.ModelPatterns, model) {
 		return ChatCompletionsToResponsesDecision{}
 	}
 
+	forceUpstreamStream := false
+	if policy.ForceUpstreamStream && !isStream {
+		groupMatched := len(policy.Groups) == 0 || matchAnyExact(policy.Groups, usingGroup)
+		nonStreamMatched := !policy.OnlyNonStream || !isStream
+		forceUpstreamStream = groupMatched && nonStreamMatched
+	}
+
 	return ChatCompletionsToResponsesDecision{
 		UseResponses:        true,
-		ForceUpstreamStream: policy.ForceUpstreamStream && !isStream,
+		ForceUpstreamStream: forceUpstreamStream,
 	}
 }
 

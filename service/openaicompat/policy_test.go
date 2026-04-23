@@ -25,13 +25,19 @@ func TestResolveChatCompletionsToResponsesPolicyHonorsGroupAndStreamScope(t *tes
 	}
 
 	streamDecision := ResolveChatCompletionsToResponsesPolicy(policy, 1, 1, "gpt-5.4", "legacy_nonstream", true)
-	if streamDecision.UseResponses {
-		t.Fatalf("expected streaming requests to be excluded when only_non_stream is enabled")
+	if !streamDecision.UseResponses {
+		t.Fatalf("expected streaming requests to keep using responses compatibility")
+	}
+	if streamDecision.ForceUpstreamStream {
+		t.Fatalf("expected streaming requests to skip force-upstream-stream")
 	}
 
 	groupMiss := ResolveChatCompletionsToResponsesPolicy(policy, 1, 1, "gpt-5.4", "default", false)
-	if groupMiss.UseResponses {
-		t.Fatalf("expected group mismatch to skip compatibility mode")
+	if !groupMiss.UseResponses {
+		t.Fatalf("expected group mismatch to keep base responses compatibility")
+	}
+	if groupMiss.ForceUpstreamStream {
+		t.Fatalf("expected group mismatch to skip force-upstream-stream")
 	}
 }
 
