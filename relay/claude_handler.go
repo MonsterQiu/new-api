@@ -109,15 +109,22 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 		}
 	}
 
+	compatPolicy := service.ResolveChatCompletionsToResponsesGlobal(
+		info.ChannelId,
+		info.ChannelType,
+		info.OriginModelName,
+		info.UsingGroup,
+		info.IsStream,
+	)
 	if !model_setting.GetGlobalSettings().PassThroughRequestEnabled &&
 		!info.ChannelSetting.PassThroughBodyEnabled &&
-		service.ShouldChatCompletionsUseResponsesGlobal(info.ChannelId, info.ChannelType, info.OriginModelName) {
+		compatPolicy.UseResponses {
 		openAIRequest, convErr := service.ClaudeToOpenAIRequest(*request, info)
 		if convErr != nil {
 			return types.NewError(convErr, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 		}
 
-		usage, newApiErr := chatCompletionsViaResponses(c, info, adaptor, openAIRequest)
+		usage, newApiErr := chatCompletionsViaResponses(c, info, adaptor, openAIRequest, compatPolicy.ForceUpstreamStream)
 		if newApiErr != nil {
 			return newApiErr
 		}

@@ -8,11 +8,14 @@ import (
 )
 
 type ChatCompletionsToResponsesPolicy struct {
-	Enabled       bool     `json:"enabled"`
-	AllChannels   bool     `json:"all_channels"`
-	ChannelIDs    []int    `json:"channel_ids,omitempty"`
-	ChannelTypes  []int    `json:"channel_types,omitempty"`
-	ModelPatterns []string `json:"model_patterns,omitempty"`
+	Enabled             bool     `json:"enabled"`
+	AllChannels         bool     `json:"all_channels"`
+	ChannelIDs          []int    `json:"channel_ids,omitempty"`
+	ChannelTypes        []int    `json:"channel_types,omitempty"`
+	ModelPatterns       []string `json:"model_patterns,omitempty"`
+	Groups              []string `json:"groups,omitempty"`
+	OnlyNonStream       bool     `json:"only_non_stream,omitempty"`
+	ForceUpstreamStream bool     `json:"force_upstream_stream,omitempty"`
 }
 
 func (p ChatCompletionsToResponsesPolicy) IsChannelEnabled(channelID int, channelType int) bool {
