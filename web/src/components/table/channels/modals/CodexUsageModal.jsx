@@ -28,7 +28,7 @@ import {
   Descriptions,
   Collapse,
 } from '@douyinfe/semi-ui';
-import { API, showError } from '../../../../helpers';
+import { API, showError, showSuccess } from '../../../../helpers';
 
 const { Text } = Typography;
 
@@ -262,10 +262,19 @@ const RateLimitWindowCard = ({ t, title, windowData }) => {
   );
 };
 
-const CodexUsageView = ({ t, record, payload, onCopy, onRefresh }) => {
+const CodexUsageView = ({
+  t,
+  record,
+  payload,
+  onCopy,
+  onRefresh,
+  onRefreshCredential,
+  credentialRefreshing,
+}) => {
   const tt = typeof t === 'function' ? t : (v) => v;
   const [showRawJson, setShowRawJson] = useState(false);
   const data = payload?.data ?? null;
+  const localOAuth = payload?.channel_oauth ?? {};
   const rateLimit = data?.rate_limit ?? {};
   const { fiveHourWindow, weeklyWindow } = resolveRateLimitWindows(data);
   const upstreamStatus = payload?.upstream_status;
@@ -274,8 +283,8 @@ const CodexUsageView = ({ t, record, payload, onCopy, onRefresh }) => {
   const accountTypeTagColor = getAccountTypeTagColor(accountType);
   const statusTag = resolveUsageStatusTag(tt, rateLimit);
   const userId = data?.user_id;
-  const email = data?.email;
-  const accountId = data?.account_id;
+  const email = data?.email ?? localOAuth?.email;
+  const accountId = data?.account_id ?? localOAuth?.account_id;
   const errorMessage =
     payload?.success === false ? getDisplayText(payload?.message) || tt('获取用量失败') : '';
 
@@ -313,9 +322,20 @@ const CodexUsageView = ({ t, record, payload, onCopy, onRefresh }) => {
               </Tag>
             </div>
           </div>
-          <Button size='small' type='tertiary' theme='outline' onClick={onRefresh}>
-            {tt('刷新')}
-          </Button>
+          <div className='flex flex-wrap gap-2'>
+            <Button
+              size='small'
+              type='tertiary'
+              theme='outline'
+              onClick={onRefreshCredential}
+              loading={credentialRefreshing}
+            >
+              {tt('刷新凭证')}
+            </Button>
+            <Button size='small' type='tertiary' theme='outline' onClick={onRefresh}>
+              {tt('刷新')}
+            </Button>
+          </div>
         </div>
 
         <div className='mt-2 rounded-lg bg-semi-color-fill-0 px-3 py-2'>
@@ -404,6 +424,7 @@ const CodexUsageView = ({ t, record, payload, onCopy, onRefresh }) => {
 const CodexUsageLoader = ({ t, record, initialPayload, onCopy }) => {
   const tt = typeof t === 'function' ? t : (v) => v;
   const [loading, setLoading] = useState(!initialPayload);
+  const [credentialRefreshing, setCredentialRefreshing] = useState(false);
   const [payload, setPayload] = useState(initialPayload ?? null);
   const hasShownErrorRef = useRef(false);
   const mountedRef = useRef(true);
@@ -437,6 +458,41 @@ const CodexUsageLoader = ({ t, record, initialPayload, onCopy }) => {
       if (mountedRef.current) setLoading(false);
     }
   }, [recordId, tt]);
+
+  const refreshCredential = useCallback(async () => {
+    if (!recordId) {
+      return;
+    }
+
+    setCredentialRefreshing(true);
+    try {
+      const res = await API.post(
+        `/api/channel/${recordId}/codex/refresh`,
+        {},
+        { skipErrorHandler: true },
+      );
+      if (!res?.data?.success) {
+        throw new Error(res?.data?.message || tt('刷新失败'));
+      }
+
+      const refreshed = res?.data?.data ?? {};
+      setPayload((prev) => ({
+        ...(prev ?? {}),
+        channel_oauth: {
+          ...(prev?.channel_oauth ?? {}),
+          account_id: refreshed?.account_id,
+          email: refreshed?.email,
+        },
+      }));
+      showSuccess(tt('凭证已刷新'));
+      hasShownErrorRef.current = false;
+      await fetchUsage();
+    } catch (error) {
+      showError(error.message || tt('刷新失败'));
+    } finally {
+      setCredentialRefreshing(false);
+    }
+  }, [recordId, tt, fetchUsage]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -483,6 +539,8 @@ const CodexUsageLoader = ({ t, record, initialPayload, onCopy }) => {
       payload={payload}
       onCopy={onCopy}
       onRefresh={fetchUsage}
+      onRefreshCredential={refreshCredential}
+      credentialRefreshing={credentialRefreshing}
     />
   );
 };

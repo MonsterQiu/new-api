@@ -58,6 +58,14 @@ func GetCodexChannelUsage(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": "codex channel: account_id is required"})
 		return
 	}
+	localOAuthInfo := gin.H{
+		"account_id": accountID,
+	}
+	if email := strings.TrimSpace(oauthKey.Email); email != "" {
+		localOAuthInfo["email"] = email
+	} else if email, ok := service.ExtractEmailFromJWT(accessToken); ok {
+		localOAuthInfo["email"] = email
+	}
 
 	client, err := service.NewProxyHttpClient(ch.GetSetting().Proxy)
 	if err != nil {
@@ -87,6 +95,10 @@ func GetCodexChannelUsage(c *gin.Context) {
 			oauthKey.Expired = res.ExpiresAt.Format(time.RFC3339)
 			if strings.TrimSpace(oauthKey.Type) == "" {
 				oauthKey.Type = "codex"
+			}
+			if email, ok := service.ExtractEmailFromJWT(oauthKey.AccessToken); ok {
+				oauthKey.Email = email
+				localOAuthInfo["email"] = email
 			}
 
 			encoded, encErr := common.Marshal(oauthKey)
@@ -118,6 +130,7 @@ func GetCodexChannelUsage(c *gin.Context) {
 		"message":         "",
 		"upstream_status": statusCode,
 		"data":            payload,
+		"channel_oauth":   localOAuthInfo,
 	}
 	if !ok {
 		resp["message"] = fmt.Sprintf("upstream status: %d", statusCode)
