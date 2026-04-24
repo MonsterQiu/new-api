@@ -25,7 +25,7 @@ func TestStripeWebhookRejectsWhenSecretMissing(t *testing.T) {
 
 	StripeWebhook(ctx)
 
-	if recorder.Code != http.StatusNotFound {
-		t.Fatalf("expected missing Stripe webhook secret to return 404, got %d", recorder.Code)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected missing Stripe webhook secret to return 403, got %d", recorder.Code)
 	}
 }

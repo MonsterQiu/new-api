@@ -22,7 +22,7 @@ func TestShouldDisableChannelQuotaExhausted429ByMessage(t *testing.T) {
 		Code:    "rate_limit_error",
 	}, http.StatusTooManyRequests)
 
-	if !ShouldDisableChannel(0, err) {
+	if !ShouldDisableChannel(err) {
 		t.Fatal("expected quota-exhausted 429 to auto-disable channel")
 	}
 }
@@ -41,7 +41,7 @@ func TestShouldDisableChannelQuotaExhausted429ByCode(t *testing.T) {
 		Code:    "insufficient_quota",
 	}, http.StatusTooManyRequests)
 
-	if !ShouldDisableChannel(0, err) {
+	if !ShouldDisableChannel(err) {
 		t.Fatal("expected insufficient_quota 429 to auto-disable channel")
 	}
 }
@@ -60,7 +60,7 @@ func TestShouldDisableChannelTransient429DoesNotDisable(t *testing.T) {
 		Code:    "rate_limit_error",
 	}, http.StatusTooManyRequests)
 
-	if ShouldDisableChannel(0, err) {
+	if ShouldDisableChannel(err) {
 		t.Fatal("expected transient 429 to stay retry-only and not auto-disable channel")
 	}
 }

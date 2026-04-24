@@ -61,7 +61,7 @@ func TestRechargeRejectsPaymentMethodMismatch(t *testing.T) {
 	user := createRechargeTestUser(t)
 	topUp := createRechargeTestTopUp(t, user.Id, "USR95NOFAKE", "alipay", 10)
 
-	err := Recharge(topUp.TradeNo, "cus_fake", "stripe")
+	err := Recharge(topUp.TradeNo, "cus_fake", "127.0.0.1")
 	require.Error(t, err)
 
 	var reloadedTopUp TopUp
@@ -81,7 +81,7 @@ func TestRechargeSucceedsForExpectedStripeMethod(t *testing.T) {
 	user := createRechargeTestUser(t)
 	topUp := createRechargeTestTopUp(t, user.Id, "ref_valid_stripe_topup", "stripe", 2)
 
-	err := Recharge(topUp.TradeNo, "cus_live", "stripe")
+	err := Recharge(topUp.TradeNo, "cus_live", "127.0.0.1")
 	require.NoError(t, err)
 
 	var reloadedTopUp TopUp
