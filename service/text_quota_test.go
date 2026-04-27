@@ -9,6 +9,7 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -365,6 +366,55 @@ func TestComposeTieredTextQuotaKeepsToolCallSurcharges(t *testing.T) {
 
 	require.Equal(t, int64(13000), summary.ToolCallSurchargeQuota.Round(0).IntPart())
 	require.Equal(t, 14000, quota)
+}
+
+func TestCalculateTextQuotaSummaryAddsResponsesImageGenerationToolUsage(t *testing.T) {
+	ratio_setting.InitRatioSettings()
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+
+	relayInfo := &relaycommon.RelayInfo{
+		OriginModelName: "gpt-5.5",
+		PriceData: types.PriceData{
+			ModelRatio:      1,
+			CompletionRatio: 1,
+			GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+		},
+		ResponsesUsageInfo: &relaycommon.ResponsesUsageInfo{
+			BuiltInTools: map[string]*relaycommon.BuildInToolInfo{},
+			ImageGeneration: &relaycommon.ResponsesImageGenerationUsageInfo{
+				ModelName: "gpt-image-2",
+				Usage: dto.Usage{
+					PromptTokens:     31,
+					CompletionTokens: 439,
+					TotalTokens:      470,
+					PromptTokensDetails: dto.InputTokenDetails{
+						TextTokens: 31,
+					},
+					CompletionTokenDetails: dto.OutputTokenDetails{
+						ImageTokens: 439,
+					},
+				},
+			},
+		},
+		StartTime: time.Now(),
+	}
+
+	usage := &dto.Usage{
+		PromptTokens:     1639,
+		CompletionTokens: 44,
+		TotalTokens:      1683,
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+
+	require.NotNil(t, summary.ImageGenerationTool)
+	require.Equal(t, "gpt-image-2", summary.ImageGenerationTool.ModelName)
+	require.Equal(t, 439, summary.ImageGenerationTool.ImageOutputTokens)
+	require.Equal(t, 6663, summary.ImageGenerationTool.Quota)
+	require.Equal(t, 2153, summary.TotalTokens)
+	require.Equal(t, 8346, summary.Quota)
 }
 
 func TestComposeTieredTextQuotaFallbackKeepsToolCallSurcharges(t *testing.T) {

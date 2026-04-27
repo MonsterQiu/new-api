@@ -56,7 +56,13 @@ type BuildInToolInfo struct {
 }
 
 type ResponsesUsageInfo struct {
-	BuiltInTools map[string]*BuildInToolInfo
+	BuiltInTools    map[string]*BuildInToolInfo
+	ImageGeneration *ResponsesImageGenerationUsageInfo
+}
+
+type ResponsesImageGenerationUsageInfo struct {
+	ModelName string
+	Usage     dto.Usage
 }
 
 type ChannelMeta struct {
@@ -287,7 +293,7 @@ func (info *RelayInfo) ToString() string {
 	}
 
 	// Responses usage info (non-sensitive)
-	if info.ResponsesUsageInfo != nil && len(info.ResponsesUsageInfo.BuiltInTools) > 0 {
+	if info.ResponsesUsageInfo != nil && (len(info.ResponsesUsageInfo.BuiltInTools) > 0 || info.ResponsesUsageInfo.ImageGeneration != nil) {
 		fmt.Fprintf(b, "ResponsesTools{ ")
 		first := true
 		for name, tool := range info.ResponsesUsageInfo.BuiltInTools {
@@ -300,6 +306,13 @@ func (info *RelayInfo) ToString() string {
 			} else {
 				fmt.Fprintf(b, "%s: calls=0", name)
 			}
+		}
+		if info.ResponsesUsageInfo.ImageGeneration != nil {
+			if !first {
+				fmt.Fprintf(b, ", ")
+			}
+			imageGen := info.ResponsesUsageInfo.ImageGeneration
+			fmt.Fprintf(b, "image_generation_usage: model=%s input=%d output=%d", imageGen.ModelName, imageGen.Usage.PromptTokens, imageGen.Usage.CompletionTokens)
 		}
 		fmt.Fprintf(b, " }, ")
 	}

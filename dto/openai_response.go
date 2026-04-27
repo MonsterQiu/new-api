@@ -227,11 +227,12 @@ type Usage struct {
 	UsageSemantic        string `json:"usage_semantic,omitempty"`
 	UsageSource          string `json:"usage_source,omitempty"`
 
-	PromptTokensDetails    InputTokenDetails  `json:"prompt_tokens_details"`
-	CompletionTokenDetails OutputTokenDetails `json:"completion_tokens_details"`
-	InputTokens            int                `json:"input_tokens"`
-	OutputTokens           int                `json:"output_tokens"`
-	InputTokensDetails     *InputTokenDetails `json:"input_tokens_details"`
+	PromptTokensDetails    InputTokenDetails   `json:"prompt_tokens_details"`
+	CompletionTokenDetails OutputTokenDetails  `json:"completion_tokens_details"`
+	InputTokens            int                 `json:"input_tokens"`
+	OutputTokens           int                 `json:"output_tokens"`
+	InputTokensDetails     *InputTokenDetails  `json:"input_tokens_details"`
+	OutputTokensDetails    *OutputTokenDetails `json:"output_tokens_details,omitempty"`
 
 	// claude cache 1h
 	ClaudeCacheCreation5mTokens int `json:"claude_cache_creation_5_m_tokens"`
@@ -239,6 +240,59 @@ type Usage struct {
 
 	// OpenRouter Params
 	Cost any `json:"cost,omitempty"`
+}
+
+func (u *Usage) NormalizeTokenDetailAliases() {
+	if u == nil {
+		return
+	}
+	if u.InputTokensDetails != nil {
+		u.PromptTokensDetails.CachedTokens = u.InputTokensDetails.CachedTokens
+		u.PromptTokensDetails.CachedCreationTokens = u.InputTokensDetails.CachedCreationTokens
+		u.PromptTokensDetails.TextTokens = u.InputTokensDetails.TextTokens
+		u.PromptTokensDetails.AudioTokens = u.InputTokensDetails.AudioTokens
+		u.PromptTokensDetails.ImageTokens = u.InputTokensDetails.ImageTokens
+	}
+	if u.OutputTokensDetails != nil {
+		if u.OutputTokensDetails.TextTokens != 0 {
+			u.CompletionTokenDetails.TextTokens = u.OutputTokensDetails.TextTokens
+		}
+		if u.OutputTokensDetails.AudioTokens != 0 {
+			u.CompletionTokenDetails.AudioTokens = u.OutputTokensDetails.AudioTokens
+		}
+		if u.OutputTokensDetails.ImageTokens != 0 {
+			u.CompletionTokenDetails.ImageTokens = u.OutputTokensDetails.ImageTokens
+		}
+		if u.OutputTokensDetails.ReasoningTokens != 0 {
+			u.CompletionTokenDetails.ReasoningTokens = u.OutputTokensDetails.ReasoningTokens
+		}
+	}
+}
+
+func UsageFromResponsesUsage(upstream *Usage) Usage {
+	usage := Usage{}
+	if upstream == nil {
+		return usage
+	}
+
+	usage = *upstream
+	if upstream.InputTokens != 0 {
+		usage.PromptTokens = upstream.InputTokens
+	}
+	if upstream.OutputTokens != 0 {
+		usage.CompletionTokens = upstream.OutputTokens
+	}
+	usage.NormalizeTokenDetailAliases()
+	if usage.CompletionTokens == 0 {
+		usage.CompletionTokens = usage.CompletionTokenDetails.TextTokens +
+			usage.CompletionTokenDetails.AudioTokens +
+			usage.CompletionTokenDetails.ImageTokens +
+			usage.CompletionTokenDetails.ReasoningTokens
+	}
+	if usage.TotalTokens == 0 {
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	}
+	return usage
 }
 
 type OpenAIVideoResponse struct {
@@ -266,29 +320,62 @@ type OutputTokenDetails struct {
 	ReasoningTokens int `json:"reasoning_tokens"`
 }
 
+type ResponsesToolUsage struct {
+	ImageGen *ResponsesImageGenerationToolUsage `json:"image_gen,omitempty"`
+}
+
+type ResponsesImageGenerationToolUsage struct {
+	InputTokens         int                 `json:"input_tokens"`
+	OutputTokens        int                 `json:"output_tokens"`
+	TotalTokens         int                 `json:"total_tokens"`
+	InputTokensDetails  *InputTokenDetails  `json:"input_tokens_details,omitempty"`
+	OutputTokensDetails *OutputTokenDetails `json:"output_tokens_details,omitempty"`
+}
+
+func (u *ResponsesImageGenerationToolUsage) ToUsage() Usage {
+	if u == nil {
+		return Usage{}
+	}
+	usage := Usage{
+		PromptTokens:        u.InputTokens,
+		CompletionTokens:    u.OutputTokens,
+		TotalTokens:         u.TotalTokens,
+		InputTokens:         u.InputTokens,
+		OutputTokens:        u.OutputTokens,
+		InputTokensDetails:  u.InputTokensDetails,
+		OutputTokensDetails: u.OutputTokensDetails,
+	}
+	if usage.TotalTokens == 0 {
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	}
+	usage.NormalizeTokenDetailAliases()
+	return usage
+}
+
 type OpenAIResponsesResponse struct {
-	ID                 string             `json:"id"`
-	Object             string             `json:"object"`
-	CreatedAt          int                `json:"created_at"`
-	Status             json.RawMessage    `json:"status"`
-	Error              any                `json:"error,omitempty"`
-	IncompleteDetails  *IncompleteDetails `json:"incomplete_details,omitempty"`
-	Instructions       json.RawMessage    `json:"instructions"`
-	MaxOutputTokens    int                `json:"max_output_tokens"`
-	Model              string             `json:"model"`
-	Output             []ResponsesOutput  `json:"output"`
-	ParallelToolCalls  bool               `json:"parallel_tool_calls"`
-	PreviousResponseID json.RawMessage    `json:"previous_response_id"`
-	Reasoning          *Reasoning         `json:"reasoning"`
-	Store              bool               `json:"store"`
-	Temperature        float64            `json:"temperature"`
-	ToolChoice         json.RawMessage    `json:"tool_choice"`
-	Tools              []map[string]any   `json:"tools"`
-	TopP               float64            `json:"top_p"`
-	Truncation         json.RawMessage    `json:"truncation"`
-	Usage              *Usage             `json:"usage"`
-	User               json.RawMessage    `json:"user"`
-	Metadata           json.RawMessage    `json:"metadata"`
+	ID                 string              `json:"id"`
+	Object             string              `json:"object"`
+	CreatedAt          int                 `json:"created_at"`
+	Status             json.RawMessage     `json:"status"`
+	Error              any                 `json:"error,omitempty"`
+	IncompleteDetails  *IncompleteDetails  `json:"incomplete_details,omitempty"`
+	Instructions       json.RawMessage     `json:"instructions"`
+	MaxOutputTokens    int                 `json:"max_output_tokens"`
+	Model              string              `json:"model"`
+	Output             []ResponsesOutput   `json:"output"`
+	ParallelToolCalls  bool                `json:"parallel_tool_calls"`
+	PreviousResponseID json.RawMessage     `json:"previous_response_id"`
+	Reasoning          *Reasoning          `json:"reasoning"`
+	Store              bool                `json:"store"`
+	Temperature        float64             `json:"temperature"`
+	ToolChoice         json.RawMessage     `json:"tool_choice"`
+	ToolUsage          *ResponsesToolUsage `json:"tool_usage,omitempty"`
+	Tools              []map[string]any    `json:"tools"`
+	TopP               float64             `json:"top_p"`
+	Truncation         json.RawMessage     `json:"truncation"`
+	Usage              *Usage              `json:"usage"`
+	User               json.RawMessage     `json:"user"`
+	Metadata           json.RawMessage     `json:"metadata"`
 }
 
 // GetOpenAIError 从动态错误类型中提取OpenAIError结构
@@ -332,6 +419,21 @@ func (o *OpenAIResponsesResponse) GetSize() string {
 	return ""
 }
 
+func (o *OpenAIResponsesResponse) GetImageGenerationToolModel() string {
+	if o == nil || len(o.Tools) == 0 {
+		return ""
+	}
+	for _, tool := range o.Tools {
+		toolType, _ := tool["type"].(string)
+		if toolType != BuildInToolImageGeneration {
+			continue
+		}
+		model, _ := tool["model"].(string)
+		return model
+	}
+	return ""
+}
+
 type IncompleteDetails struct {
 	Reasoning string `json:"reasoning"`
 }
@@ -361,6 +463,7 @@ type ResponsesReasoningSummaryPart struct {
 }
 
 const (
+	BuildInToolImageGeneration  = "image_generation"
 	BuildInToolWebSearchPreview = "web_search_preview"
 	BuildInToolFileSearch       = "file_search"
 )

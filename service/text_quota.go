@@ -12,7 +12,9 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -52,7 +54,28 @@ type textQuotaSummary struct {
 	FileSearchCallCount      int
 	AudioInputPrice          float64
 	ImageGenerationCallPrice float64
+	ImageGenerationTool      *imageGenerationToolQuotaSummary
 	ToolCallSurchargeQuota   decimal.Decimal
+}
+
+type imageGenerationToolQuotaSummary struct {
+	ModelName              string
+	PromptTokens           int
+	CompletionTokens       int
+	TotalTokens            int
+	CacheTokens            int
+	TextInputTokens        int
+	ImageInputTokens       int
+	TextOutputTokens       int
+	ImageOutputTokens      int
+	ModelRatio             float64
+	CompletionRatio        float64
+	CacheRatio             float64
+	ImageRatio             float64
+	BillingMode            string
+	MatchedTier            string
+	Quota                  int
+	ActualQuotaBeforeGroup float64
 }
 
 func cacheWriteTokensTotal(summary textQuotaSummary) int {
@@ -77,6 +100,109 @@ func isLegacyClaudeDerivedOpenAIUsage(relayInfo *relaycommon.RelayInfo, usage *d
 		return false
 	}
 	return usage.ClaudeCacheCreation5mTokens > 0 || usage.ClaudeCacheCreation1hTokens > 0
+}
+
+func calculateResponsesImageGenerationToolQuota(relayInfo *relaycommon.RelayInfo, groupRatio float64) (*imageGenerationToolQuotaSummary, decimal.Decimal) {
+	if relayInfo == nil || relayInfo.ResponsesUsageInfo == nil || relayInfo.ResponsesUsageInfo.ImageGeneration == nil {
+		return nil, decimal.Zero
+	}
+
+	imageGen := relayInfo.ResponsesUsageInfo.ImageGeneration
+	usage := imageGen.Usage
+	if usage.TotalTokens == 0 {
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	}
+	if usage.TotalTokens == 0 {
+		return nil, decimal.Zero
+	}
+
+	modelName := strings.TrimSpace(imageGen.ModelName)
+	if modelName == "" {
+		modelName = "gpt-image-2"
+	}
+
+	summary := &imageGenerationToolQuotaSummary{
+		ModelName:         modelName,
+		PromptTokens:      usage.PromptTokens,
+		CompletionTokens:  usage.CompletionTokens,
+		TotalTokens:       usage.TotalTokens,
+		CacheTokens:       usage.PromptTokensDetails.CachedTokens,
+		TextInputTokens:   usage.PromptTokensDetails.TextTokens,
+		ImageInputTokens:  usage.PromptTokensDetails.ImageTokens,
+		TextOutputTokens:  usage.CompletionTokenDetails.TextTokens,
+		ImageOutputTokens: usage.CompletionTokenDetails.ImageTokens,
+		BillingMode:       billing_setting.BillingModeRatio,
+	}
+
+	if billing_setting.GetBillingMode(modelName) == billing_setting.BillingModeTieredExpr {
+		if exprStr, ok := billing_setting.GetBillingExpr(modelName); ok {
+			params := BuildTieredTokenParams(&usage, false, billingexpr.UsedVars(exprStr))
+			requestInput := billingexpr.RequestInput{}
+			if relayInfo.BillingRequestInput != nil {
+				requestInput = *relayInfo.BillingRequestInput
+			}
+			snap := &billingexpr.BillingSnapshot{
+				BillingMode:  billing_setting.BillingModeTieredExpr,
+				ModelName:    modelName,
+				ExprString:   exprStr,
+				ExprHash:     billingexpr.ExprHashString(exprStr),
+				GroupRatio:   groupRatio,
+				QuotaPerUnit: common.QuotaPerUnit,
+				ExprVersion:  billingexpr.ExprVersion(exprStr),
+			}
+			if result, err := billingexpr.ComputeTieredQuotaWithRequest(snap, params, requestInput); err == nil {
+				summary.BillingMode = billing_setting.BillingModeTieredExpr
+				summary.MatchedTier = result.MatchedTier
+				summary.Quota = result.ActualQuotaAfterGroup
+				summary.ActualQuotaBeforeGroup = result.ActualQuotaBeforeGroup
+				return summary, decimal.NewFromInt(int64(result.ActualQuotaAfterGroup))
+			}
+		}
+	}
+
+	modelRatio, modelRatioOK, _ := ratio_setting.GetModelRatio(modelName)
+	if !modelRatioOK {
+		return summary, decimal.Zero
+	}
+	completionRatio := ratio_setting.GetCompletionRatio(modelName)
+	cacheRatio, _ := ratio_setting.GetCacheRatio(modelName)
+	imageRatio, _ := ratio_setting.GetImageRatio(modelName)
+
+	summary.ModelRatio = modelRatio
+	summary.CompletionRatio = completionRatio
+	summary.CacheRatio = cacheRatio
+	summary.ImageRatio = imageRatio
+
+	dPromptTokens := decimal.NewFromInt(int64(usage.PromptTokens))
+	dCacheTokens := decimal.NewFromInt(int64(usage.PromptTokensDetails.CachedTokens))
+	dImageTokens := decimal.NewFromInt(int64(usage.PromptTokensDetails.ImageTokens))
+	dCompletionTokens := decimal.NewFromInt(int64(usage.CompletionTokens))
+
+	baseTokens := dPromptTokens
+	if !dCacheTokens.IsZero() {
+		baseTokens = baseTokens.Sub(dCacheTokens)
+	}
+	if !dImageTokens.IsZero() {
+		baseTokens = baseTokens.Sub(dImageTokens)
+	}
+	if baseTokens.IsNegative() {
+		baseTokens = decimal.Zero
+	}
+
+	weightedPrompt := baseTokens.
+		Add(dCacheTokens.Mul(decimal.NewFromFloat(cacheRatio))).
+		Add(dImageTokens.Mul(decimal.NewFromFloat(imageRatio)))
+	weightedCompletion := dCompletionTokens.Mul(decimal.NewFromFloat(completionRatio))
+	quota := weightedPrompt.
+		Add(weightedCompletion).
+		Mul(decimal.NewFromFloat(modelRatio)).
+		Mul(decimal.NewFromFloat(groupRatio))
+	if !quota.IsZero() && quota.LessThan(decimal.NewFromInt(1)) {
+		quota = decimal.NewFromInt(1)
+	}
+
+	summary.Quota = int(quota.Round(0).IntPart())
+	return summary, decimal.NewFromInt(int64(summary.Quota))
 }
 
 func calculateTextToolCallSurcharge(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, summary *textQuotaSummary) decimal.Decimal {
@@ -126,7 +252,12 @@ func calculateTextToolCallSurcharge(ctx *gin.Context, relayInfo *relaycommon.Rel
 		}
 	}
 
-	if ctx.GetBool("image_generation_call") {
+	if imageGenSummary, imageGenQuota := calculateResponsesImageGenerationToolQuota(relayInfo, summary.GroupRatio); imageGenSummary != nil {
+		summary.ImageGenerationTool = imageGenSummary
+		surcharge = surcharge.Add(imageGenQuota)
+	}
+
+	if summary.ImageGenerationTool == nil && ctx.GetBool("image_generation_call") {
 		summary.ImageGenerationCallPrice = operation_setting.GetGPTImage1PriceOnceCall(ctx.GetString("image_generation_call_quality"), ctx.GetString("image_generation_call_size"))
 		surcharge = surcharge.Add(decimal.NewFromFloat(summary.ImageGenerationCallPrice).
 			Mul(dGroupRatio).
@@ -225,6 +356,9 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 
 	ratio := dModelRatio.Mul(dGroupRatio)
 	summary.ToolCallSurchargeQuota = calculateTextToolCallSurcharge(ctx, relayInfo, &summary)
+	if summary.ImageGenerationTool != nil {
+		summary.TotalTokens += summary.ImageGenerationTool.TotalTokens
+	}
 
 	var audioInputQuota decimal.Decimal
 	if !relayInfo.PriceData.UsePrice {
@@ -359,6 +493,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	if summary.ImageGenerationCallPrice > 0 {
 		extraContent = append(extraContent, fmt.Sprintf("Image Generation Call 花费 %s", decimal.NewFromFloat(summary.ImageGenerationCallPrice).Mul(decimal.NewFromFloat(summary.GroupRatio)).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).String()))
 	}
+	if summary.ImageGenerationTool != nil && summary.ImageGenerationTool.Quota > 0 {
+		extraContent = append(extraContent, fmt.Sprintf("Image Generation 工具模型 %s 花费 %s", summary.ImageGenerationTool.ModelName, logger.LogQuota(summary.ImageGenerationTool.Quota)))
+	}
 
 	if summary.TotalTokens == 0 {
 		extraContent = append(extraContent, "上游没有返回计费信息，无法扣费（可能是上游超时）")
@@ -426,6 +563,30 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	if summary.ImageGenerationCallPrice > 0 {
 		other["image_generation_call"] = true
 		other["image_generation_call_price"] = summary.ImageGenerationCallPrice
+	}
+	if summary.ImageGenerationTool != nil {
+		imageGen := summary.ImageGenerationTool
+		other["responses_image_generation"] = true
+		other["responses_image_generation_model"] = imageGen.ModelName
+		other["responses_image_generation_prompt_tokens"] = imageGen.PromptTokens
+		other["responses_image_generation_completion_tokens"] = imageGen.CompletionTokens
+		other["responses_image_generation_total_tokens"] = imageGen.TotalTokens
+		other["responses_image_generation_cache_tokens"] = imageGen.CacheTokens
+		other["responses_image_generation_text_input_tokens"] = imageGen.TextInputTokens
+		other["responses_image_generation_image_input_tokens"] = imageGen.ImageInputTokens
+		other["responses_image_generation_text_output_tokens"] = imageGen.TextOutputTokens
+		other["responses_image_generation_image_output_tokens"] = imageGen.ImageOutputTokens
+		other["responses_image_generation_quota"] = imageGen.Quota
+		other["responses_image_generation_billing_mode"] = imageGen.BillingMode
+		if imageGen.BillingMode == billing_setting.BillingModeTieredExpr {
+			other["responses_image_generation_matched_tier"] = imageGen.MatchedTier
+			other["responses_image_generation_quota_before_group"] = imageGen.ActualQuotaBeforeGroup
+		} else {
+			other["responses_image_generation_model_ratio"] = imageGen.ModelRatio
+			other["responses_image_generation_completion_ratio"] = imageGen.CompletionRatio
+			other["responses_image_generation_cache_ratio"] = imageGen.CacheRatio
+			other["responses_image_generation_image_ratio"] = imageGen.ImageRatio
+		}
 	}
 	if summary.CacheCreationTokens > 0 {
 		other["cache_creation_tokens"] = summary.CacheCreationTokens

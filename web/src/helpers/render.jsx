@@ -1300,6 +1300,215 @@ function renderBillingArticle(lines, { showReferenceNote = true } = {}) {
   );
 }
 
+function toBillingNumber(value, fallback = 0) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function quotaToUsdAmount(quota) {
+  const quotaPerUnit = Number(localStorage.getItem('quota_per_unit'));
+  if (!Number.isFinite(quotaPerUnit) || quotaPerUnit <= 0) {
+    return 0;
+  }
+  return toBillingNumber(quota) / quotaPerUnit;
+}
+
+function hasResponsesImageGenerationBilling(opts) {
+  return (
+    opts?.responses_image_generation === true ||
+    toBillingNumber(opts?.responses_image_generation_total_tokens) > 0 ||
+    toBillingNumber(opts?.responses_image_generation_quota) > 0
+  );
+}
+
+function getResponsesImageGenerationTokenSummary(opts) {
+  const promptTokens = toBillingNumber(
+    opts?.responses_image_generation_prompt_tokens,
+  );
+  const completionTokens = toBillingNumber(
+    opts?.responses_image_generation_completion_tokens,
+  );
+  const cacheTokens = toBillingNumber(
+    opts?.responses_image_generation_cache_tokens,
+  );
+  const imageInputTokens = toBillingNumber(
+    opts?.responses_image_generation_image_input_tokens,
+  );
+  const textInputTokens = toBillingNumber(
+    opts?.responses_image_generation_text_input_tokens,
+    Math.max(promptTokens - cacheTokens - imageInputTokens, 0),
+  );
+  const imageOutputTokens = toBillingNumber(
+    opts?.responses_image_generation_image_output_tokens,
+  );
+  const textOutputTokens = toBillingNumber(
+    opts?.responses_image_generation_text_output_tokens,
+  );
+
+  const parts = [
+    textInputTokens > 0
+      ? buildBillingText('文本输入 {{tokens}} tokens', {
+          tokens: textInputTokens,
+        })
+      : null,
+    cacheTokens > 0
+      ? buildBillingText('缓存输入 {{tokens}} tokens', {
+          tokens: cacheTokens,
+        })
+      : null,
+    imageInputTokens > 0
+      ? buildBillingText('图片输入 {{tokens}} tokens', {
+          tokens: imageInputTokens,
+        })
+      : null,
+    imageOutputTokens > 0
+      ? buildBillingText('图片输出 {{tokens}} tokens', {
+          tokens: imageOutputTokens,
+        })
+      : null,
+    imageOutputTokens === 0 && textOutputTokens > 0
+      ? buildBillingText('文本输出 {{tokens}} tokens', {
+          tokens: textOutputTokens,
+        })
+      : null,
+    imageOutputTokens === 0 && textOutputTokens === 0 && completionTokens > 0
+      ? buildBillingText('输出 {{tokens}} tokens', {
+          tokens: completionTokens,
+        })
+      : null,
+  ].filter(Boolean);
+
+  return parts.join('，');
+}
+
+function renderResponsesImageGenerationBillingLines(
+  opts,
+  displayMode = 'price',
+) {
+  if (!hasResponsesImageGenerationBilling(opts)) {
+    return [];
+  }
+
+  const model = opts?.responses_image_generation_model || 'gpt-image-2';
+  const quota = toBillingNumber(opts?.responses_image_generation_quota);
+  const billingMode = opts?.responses_image_generation_billing_mode || 'ratio';
+  const tokenSummary = getResponsesImageGenerationTokenSummary(opts);
+  const lines = [
+    buildBillingText('图片生成工具：{{model}}{{tokens}}', {
+      model,
+      tokens: tokenSummary ? `（${tokenSummary}）` : '',
+    }),
+  ];
+
+  if (billingMode === 'tiered_expr') {
+    if (opts?.responses_image_generation_matched_tier) {
+      lines.push(
+        buildBillingText('图片生成工具命中档位：{{tier}}', {
+          tier: opts.responses_image_generation_matched_tier,
+        }),
+      );
+    }
+  } else if (isPriceDisplayMode(displayMode)) {
+    const modelRatio = toBillingNumber(
+      opts?.responses_image_generation_model_ratio,
+    );
+    const completionRatio = toBillingNumber(
+      opts?.responses_image_generation_completion_ratio,
+    );
+    const cacheRatio = toBillingNumber(
+      opts?.responses_image_generation_cache_ratio,
+      1,
+    );
+    const imageRatio = toBillingNumber(
+      opts?.responses_image_generation_image_ratio,
+      1,
+    );
+    lines.push(
+      buildBillingText(
+        '图片生成工具价格：文本输入 {{textPrice}} / 1M tokens，缓存输入 {{cachePrice}} / 1M tokens，图片输入 {{imagePrice}} / 1M tokens，输出 {{outputPrice}} / 1M tokens',
+        {
+          textPrice: formatCompactDisplayPrice(modelRatio * 2.0),
+          cachePrice: formatCompactDisplayPrice(modelRatio * 2.0 * cacheRatio),
+          imagePrice: formatCompactDisplayPrice(modelRatio * 2.0 * imageRatio),
+          outputPrice: formatCompactDisplayPrice(
+            modelRatio * 2.0 * completionRatio,
+          ),
+        },
+      ),
+    );
+  } else {
+    lines.push(
+      buildBillingText(
+        '图片生成工具倍率：模型 {{modelRatio}}，缓存 {{cacheRatio}}，图片输入 {{imageRatio}}，输出 {{completionRatio}}',
+        {
+          modelRatio: toBillingNumber(
+            opts?.responses_image_generation_model_ratio,
+          ),
+          cacheRatio: toBillingNumber(
+            opts?.responses_image_generation_cache_ratio,
+            1,
+          ),
+          imageRatio: toBillingNumber(
+            opts?.responses_image_generation_image_ratio,
+            1,
+          ),
+          completionRatio: toBillingNumber(
+            opts?.responses_image_generation_completion_ratio,
+          ),
+        },
+      ),
+    );
+  }
+
+  if (quota > 0) {
+    lines.push(
+      buildBillingText('图片生成工具扣费：{{quota}}', {
+        quota: renderQuota(quota, 6),
+      }),
+    );
+  }
+
+  return lines;
+}
+
+function renderResponsesImageGenerationSimpleSegments(opts) {
+  if (!hasResponsesImageGenerationBilling(opts)) {
+    return [];
+  }
+  const model = opts?.responses_image_generation_model || 'gpt-image-2';
+  const quota = toBillingNumber(opts?.responses_image_generation_quota);
+  return [
+    {
+      tone: 'secondary',
+      text: i18next.t('图片生成 {{model}}', { model }),
+    },
+    quota > 0
+      ? {
+          tone: 'secondary',
+          text: i18next.t('图片扣费 {{quota}}', {
+            quota: renderQuota(quota, 6),
+          }),
+        }
+      : null,
+  ].filter(Boolean);
+}
+
+function renderResponsesImageGenerationSimpleText(opts) {
+  if (!hasResponsesImageGenerationBilling(opts)) {
+    return '';
+  }
+  const model = opts?.responses_image_generation_model || 'gpt-image-2';
+  const quota = toBillingNumber(opts?.responses_image_generation_quota);
+  return joinBillingSummary([
+    i18next.t('图片生成 {{model}}', { model }),
+    quota > 0
+      ? i18next.t('图片扣费 {{quota}}', {
+          quota: renderQuota(quota, 6),
+        })
+      : null,
+  ]);
+}
+
 // Shared core for simple price rendering (used by OpenAI-like and Claude-like variants)
 function renderPriceSimpleCore({
   modelRatio,
@@ -1627,10 +1836,9 @@ function renderPriceSimpleCore({
 
 export function renderTaskBillingProcess(other, content) {
   if (other?.task_id != null) {
-    return renderBillingArticle(
-      [content].filter(Boolean),
-      { showReferenceNote: false },
-    );
+    return renderBillingArticle([content].filter(Boolean), {
+      showReferenceNote: false,
+    });
   }
   return renderBillingArticle([
     buildBillingText('任务预扣费（将在任务完成后按实际token重算）'),
@@ -1672,10 +1880,18 @@ export function renderModelPrice(opts) {
   const completionRatio = _completionRatio ?? 0;
 
   const { symbol, rate } = getCurrencyConfig();
+  const responsesImageGenerationQuota = toBillingNumber(
+    opts?.responses_image_generation_quota,
+  );
+  const responsesImageGenerationAmount = hasResponsesImageGenerationBilling(
+    opts,
+  )
+    ? quotaToUsdAmount(responsesImageGenerationQuota)
+    : 0;
 
   if (!shouldUseRatioBillingProcess(modelPrice)) {
     if (modelPrice !== -1) {
-      return renderBillingArticle([
+      const perCallLines = [
         buildBillingPriceText('按次：{{symbol}}{{price}}', {
           symbol,
           usdAmount: modelPrice,
@@ -1693,7 +1909,18 @@ export function renderModelPrice(opts) {
             total: formatBillingDisplayPrice(modelPrice * groupRatio, rate),
           },
         ),
-      ]);
+        ...renderResponsesImageGenerationBillingLines(opts, displayMode),
+      ];
+      if (hasResponsesImageGenerationBilling(opts)) {
+        perCallLines.push(
+          buildBillingText('合计：{{total}}', {
+            total: renderDisplayAmountFromUsd(
+              modelPrice * groupRatio + responsesImageGenerationAmount,
+            ),
+          }),
+        );
+      }
+      return renderBillingArticle(perCallLines);
     }
 
     const inputRatioPrice = modelRatio * 2.0;
@@ -1715,7 +1942,8 @@ export function renderModelPrice(opts) {
       (completionTokens / 1000000) * completionRatioPrice * groupRatio +
       (webSearchCallCount / 1000) * webSearchPrice * groupRatio +
       (fileSearchCallCount / 1000) * fileSearchPrice * groupRatio +
-      imageGenerationCallPrice * groupRatio;
+      imageGenerationCallPrice * groupRatio +
+      responsesImageGenerationAmount;
 
     let inputDesc = '';
     if (image && imageOutputTokens > 0) {
@@ -1813,6 +2041,12 @@ export function renderModelPrice(opts) {
             },
           )
         : '',
+      hasResponsesImageGenerationBilling(opts) &&
+      responsesImageGenerationQuota > 0
+        ? buildBillingText(' + 图片生成工具 {{quota}}', {
+            quota: renderQuota(responsesImageGenerationQuota, 6),
+          })
+        : '',
     ].join('');
 
     const billingLines = [
@@ -1876,6 +2110,7 @@ export function renderModelPrice(opts) {
             rate,
           })
         : null,
+      ...renderResponsesImageGenerationBillingLines(opts, displayMode),
       buildBillingText(
         '{{inputDesc}} + {{outputDesc}}{{extraServices}} = {{symbol}}{{total}}',
         {
@@ -1955,7 +2190,8 @@ export function renderModelPrice(opts) {
     completionAmount +
     webSearchAmount +
     fileSearchAmount +
-    imageGenerationAmount;
+    imageGenerationAmount +
+    responsesImageGenerationAmount;
 
   return renderBillingArticle([
     [
@@ -2084,6 +2320,7 @@ export function renderModelPrice(opts) {
           },
         )
       : null,
+    ...renderResponsesImageGenerationBillingLines(opts, displayMode),
     buildBillingText('合计：{{total}}', {
       total: renderDisplayAmountFromUsd(totalAmount),
     }),
@@ -2247,7 +2484,10 @@ export function parseTiersFromExpr(exprStr) {
   try {
     const { body } = stripExprVersion(exprStr);
     const condGroup = `((?:(?:p|c)\\s*(?:<|<=|>|>=)\\s*[\\d.eE+]+)(?:\\s*&&\\s*(?:p|c)\\s*(?:<|<=|>|>=)\\s*[\\d.eE+]+)*)`;
-    const tierRe = new RegExp(`(?:${condGroup}\\s*\\?\\s*)?tier\\("([^"]*)",\\s*([^)]+)\\)`, 'g');
+    const tierRe = new RegExp(
+      `(?:${condGroup}\\s*\\?\\s*)?tier\\("([^"]*)",\\s*([^)]+)\\)`,
+      'g',
+    );
     const tiers = [];
     let m;
     while ((m = tierRe.exec(body)) !== null) {
@@ -2256,7 +2496,8 @@ export function parseTiersFromExpr(exprStr) {
       if (condStr) {
         for (const cp of condStr.split(/\s*&&\s*/)) {
           const cm = cp.trim().match(/^(p|c)\s*(<|<=|>|>=)\s*([\d.eE+]+)$/);
-          if (cm) conditions.push({ var: cm[1], op: cm[2], value: Number(cm[3]) });
+          if (cm)
+            conditions.push({ var: cm[1], op: cm[2], value: Number(cm[3]) });
         }
       }
       const tier = parseTierBody(m[3]);
@@ -2283,7 +2524,11 @@ export function renderTieredModelPrice(opts) {
     cache_creation_tokens_1h: cacheCreationTokens1h = 0,
   } = opts;
   let exprStr = '';
-  try { exprStr = atob(exprB64); } catch { /* ignore */ }
+  try {
+    exprStr = atob(exprB64);
+  } catch {
+    /* ignore */
+  }
   const tiers = parseTiersFromExpr(exprStr);
   if (tiers.length === 0) {
     return i18next.t('阶梯计费（表达式解析失败）');
@@ -2300,8 +2545,13 @@ export function renderTieredModelPrice(opts) {
     ...priceLines
       .filter(([field]) => tier[field] > 0)
       .map(([field, label]) =>
-        buildBillingPriceText(`${label}：{{symbol}}{{price}} / 1M tokens`, { symbol, usdAmount: tier[field], rate }),
+        buildBillingPriceText(`${label}：{{symbol}}{{price}} / 1M tokens`, {
+          symbol,
+          usdAmount: tier[field],
+          rate,
+        }),
       ),
+    ...renderResponsesImageGenerationBillingLines(opts, opts.displayMode),
   ];
 
   return renderBillingArticle(lines);
@@ -2321,7 +2571,11 @@ export function renderTieredModelPriceSimple(opts) {
     outputMode = 'segments',
   } = opts;
   let exprStr = '';
-  try { exprStr = atob(exprB64); } catch { /* ignore */ }
+  try {
+    exprStr = atob(exprB64);
+  } catch {
+    /* ignore */
+  }
   const tiers = parseTiersFromExpr(exprStr);
   const tier = tiers.find((t) => t.label === matchedTier) || tiers[0];
 
@@ -2348,7 +2602,7 @@ export function renderTieredModelPriceSimple(opts) {
       }
     }
 
-    return segments;
+    return [...segments, ...renderResponsesImageGenerationSimpleSegments(opts)];
   }
 
   return [];
@@ -2375,7 +2629,7 @@ export function renderModelPriceSimple(opts) {
     displayMode = 'price',
     outputMode = 'text',
   } = opts;
-  return renderPriceSimpleCore({
+  const rendered = renderPriceSimpleCore({
     modelRatio,
     modelPrice,
     groupRatio,
@@ -2394,6 +2648,16 @@ export function renderModelPriceSimple(opts) {
     displayMode,
     outputMode,
   });
+
+  if (outputMode === 'segments') {
+    return [...rendered, ...renderResponsesImageGenerationSimpleSegments(opts)];
+  }
+
+  const imageGenerationText = renderResponsesImageGenerationSimpleText(opts);
+  if (!imageGenerationText) {
+    return rendered;
+  }
+  return `${rendered}\n\r${imageGenerationText}`;
 }
 
 export function renderAudioModelPrice(opts) {
