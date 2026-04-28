@@ -49,21 +49,21 @@ const Home = () => {
       ? 'Sisyphus 网关现已就绪'
       : 'Sisyphus gateway is now ready';
   const heroTitle = isChinese
-    ? '代码即巨石，协议为山径。'
-    : 'Code is the boulder, protocol the mountain path.';
+    ? 'Sisyphus API'
+    : 'Sisyphus API';
   const heroAccent = isChinese
-    ? '西西弗斯的精神，在此永存。'
-    : 'The spirit of Sisyphus lives on here.';
+    ? '体验额度进群领取157708448'
+    : '';
   const heroMetrics = isChinese
     ? [
         { value: '99.9%', label: '可用性' },
         { value: '<100ms', label: '路由延迟' },
-        { value: '30+', label: '模型与供应商' },
+        { value: '>98%', label: '缓存率' },
       ]
     : [
         { value: '99.9%', label: 'Uptime' },
         { value: '<100ms', label: 'Routing latency' },
-        { value: '30+', label: 'Models and providers' },
+        { value: '>98%', label: 'Cache rate' },
       ];
   const providerStrip = [
     { label: 'OPENAI', icon: 'psychiatry' },
