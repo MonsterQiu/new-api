@@ -48,12 +48,10 @@ const Home = () => {
     : isChinese
       ? 'Sisyphus 网关现已就绪'
       : 'Sisyphus gateway is now ready';
-  const heroTitle = isChinese
-    ? 'Sisyphus API'
-    : 'Sisyphus API';
+  const heroTitle = isChinese ? 'Sisyphus API' : 'Sisyphus API';
   const heroAccent = isChinese
-    ? '体验额度进群领取157708448'
-    : '';
+    ? '领体验额度QQ群：157708448'
+    : 'Domestic Direct Access';
   const heroMetrics = isChinese
     ? [
         { value: '99.9%', label: '可用性' },
@@ -243,6 +241,17 @@ const Home = () => {
                         {isChinese ? '获取 API Key' : 'Get API Key'}
                       </Button>
                     </Link>
+                  </div>
+                </div>
+                <div
+                  className='w-full max-w-[860px] rounded-2xl border border-[#c2652a]/70 bg-[#171311]/70 px-6 py-5 text-center
+  shadow-[0_12px_36px_rgba(194,101,42,0.12)]'
+                >
+                  <div className='font-body text-sm font-semibold tracking-[0.08em] text-[#8f7f74]'>
+                    联系方式
+                  </div>
+                  <div className='mt-2 font-headline text-2xl  text-[#c2652a] md:text-3xl'>
+                    VX联系方式：sisyphusx_api
                   </div>
                 </div>
 
