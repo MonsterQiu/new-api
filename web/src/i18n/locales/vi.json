@@ -2086,6 +2086,8 @@
     "模型定价，需要登录访问": "Định giá mô hình, yêu cầu đăng nhập để truy cập",
     "模型定价设置": "Model Pricing",
     "模型广场": "Thị trường mô hình",
+    "作图工具": "Công cụ vẽ",
+    "一键跳转到作图工具": "Chuyển đến công cụ vẽ chỉ với một lần nhấp",
     "模型库": "Thư viện mô hình",
     "模型拉取失败: {{error}}": "Failed to pull model: {{error}}",
     "模型排序": "Sắp xếp mô hình",
