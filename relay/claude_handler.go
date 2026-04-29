@@ -128,6 +128,25 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 		}
 	}
 
+	claudeResponsesPolicy := service.ResolveClaudeMessagesToResponsesGlobal(
+		info.ChannelId,
+		info.ChannelType,
+		info.OriginModelName,
+		info.UsingGroup,
+		info.IsStream,
+	)
+	if !model_setting.GetGlobalSettings().PassThroughRequestEnabled &&
+		!info.ChannelSetting.PassThroughBodyEnabled &&
+		claudeResponsesPolicy.UseResponses {
+		usage, newApiErr := claudeMessagesViaResponses(c, info, adaptor, request, claudeResponsesPolicy.ForceUpstreamStream)
+		if newApiErr != nil {
+			return newApiErr
+		}
+
+		service.PostTextConsumeQuota(c, info, usage, nil)
+		return nil
+	}
+
 	compatPolicy := service.ResolveChatCompletionsToResponsesGlobal(
 		info.ChannelId,
 		info.ChannelType,

@@ -11,6 +11,11 @@ type ChatCompletionsToResponsesDecision struct {
 	ForceUpstreamStream bool
 }
 
+type ClaudeMessagesToResponsesDecision struct {
+	UseResponses        bool
+	ForceUpstreamStream bool
+}
+
 func ResolveChatCompletionsToResponsesPolicy(
 	policy model_setting.ChatCompletionsToResponsesPolicy,
 	channelID int,
@@ -75,6 +80,63 @@ func ShouldChatCompletionsUseResponsesGlobal(
 	isStream bool,
 ) bool {
 	return ResolveChatCompletionsToResponsesGlobal(channelID, channelType, model, usingGroup, isStream).UseResponses
+}
+
+func ResolveClaudeMessagesToResponsesPolicy(
+	policy model_setting.ClaudeMessagesToResponsesPolicy,
+	channelID int,
+	channelType int,
+	model string,
+	usingGroup string,
+	isStream bool,
+) ClaudeMessagesToResponsesDecision {
+	if !policy.IsChannelEnabled(channelID, channelType) {
+		return ClaudeMessagesToResponsesDecision{}
+	}
+	if !matchAnyRegex(policy.ModelPatterns, model) {
+		return ClaudeMessagesToResponsesDecision{}
+	}
+	if len(policy.Groups) > 0 && !matchAnyExact(policy.Groups, usingGroup) {
+		return ClaudeMessagesToResponsesDecision{}
+	}
+
+	forceUpstreamStream := false
+	if policy.ForceUpstreamStream && !isStream {
+		nonStreamMatched := !policy.OnlyNonStream || !isStream
+		forceUpstreamStream = nonStreamMatched
+	}
+
+	return ClaudeMessagesToResponsesDecision{
+		UseResponses:        true,
+		ForceUpstreamStream: forceUpstreamStream,
+	}
+}
+
+func ResolveClaudeMessagesToResponsesGlobal(
+	channelID int,
+	channelType int,
+	model string,
+	usingGroup string,
+	isStream bool,
+) ClaudeMessagesToResponsesDecision {
+	return ResolveClaudeMessagesToResponsesPolicy(
+		model_setting.GetGlobalSettings().ClaudeMessagesToResponsesPolicy,
+		channelID,
+		channelType,
+		model,
+		usingGroup,
+		isStream,
+	)
+}
+
+func ShouldClaudeMessagesUseResponsesGlobal(
+	channelID int,
+	channelType int,
+	model string,
+	usingGroup string,
+	isStream bool,
+) bool {
+	return ResolveClaudeMessagesToResponsesGlobal(channelID, channelType, model, usingGroup, isStream).UseResponses
 }
 
 func matchAnyExact(values []string, candidate string) bool {

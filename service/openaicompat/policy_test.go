@@ -56,3 +56,40 @@ func TestResolveChatCompletionsToResponsesPolicyPreservesLegacyBehavior(t *testi
 		t.Fatalf("expected upstream stream forcing to stay disabled by default")
 	}
 }
+
+func TestResolveClaudeMessagesToResponsesPolicyScopesUseResponsesByGroup(t *testing.T) {
+	policy := model_setting.ClaudeMessagesToResponsesPolicy{
+		Enabled:             true,
+		AllChannels:         true,
+		ModelPatterns:       []string{`^claude-opus-4\.7$`, `^claude-sonnet-4\.6$`},
+		Groups:              []string{"claude_code"},
+		OnlyNonStream:       true,
+		ForceUpstreamStream: true,
+	}
+
+	decision := ResolveClaudeMessagesToResponsesPolicy(policy, 1, 1, "claude-opus-4.7", "claude_code", false)
+	if !decision.UseResponses {
+		t.Fatalf("expected Claude Messages policy to enable responses compatibility")
+	}
+	if !decision.ForceUpstreamStream {
+		t.Fatalf("expected non-stream Claude Code request to force upstream stream")
+	}
+
+	streamDecision := ResolveClaudeMessagesToResponsesPolicy(policy, 1, 1, "claude-sonnet-4.6", "claude_code", true)
+	if !streamDecision.UseResponses {
+		t.Fatalf("expected streaming Claude Code request to keep responses compatibility")
+	}
+	if streamDecision.ForceUpstreamStream {
+		t.Fatalf("expected streaming request to skip force-upstream-stream")
+	}
+
+	groupMiss := ResolveClaudeMessagesToResponsesPolicy(policy, 1, 1, "claude-opus-4.7", "default", false)
+	if groupMiss.UseResponses {
+		t.Fatalf("expected group mismatch to skip Claude Messages responses compatibility")
+	}
+
+	modelMiss := ResolveClaudeMessagesToResponsesPolicy(policy, 1, 1, "gpt-5.5", "claude_code", false)
+	if modelMiss.UseResponses {
+		t.Fatalf("expected model mismatch to skip Claude Messages responses compatibility")
+	}
+}

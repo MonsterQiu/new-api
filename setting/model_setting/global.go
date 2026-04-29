@@ -35,10 +35,13 @@ func (p ChatCompletionsToResponsesPolicy) IsChannelEnabled(channelID int, channe
 	return false
 }
 
+type ClaudeMessagesToResponsesPolicy = ChatCompletionsToResponsesPolicy
+
 type GlobalSettings struct {
 	PassThroughRequestEnabled        bool                             `json:"pass_through_request_enabled"`
 	ThinkingModelBlacklist           []string                         `json:"thinking_model_blacklist"`
 	ChatCompletionsToResponsesPolicy ChatCompletionsToResponsesPolicy `json:"chat_completions_to_responses_policy"`
+	ClaudeMessagesToResponsesPolicy  ClaudeMessagesToResponsesPolicy  `json:"claude_messages_to_responses_policy"`
 }
 
 // 默认配置
@@ -49,6 +52,10 @@ var defaultOpenaiSettings = GlobalSettings{
 		"kimi-k2-thinking",
 	},
 	ChatCompletionsToResponsesPolicy: ChatCompletionsToResponsesPolicy{
+		Enabled:     false,
+		AllChannels: true,
+	},
+	ClaudeMessagesToResponsesPolicy: ClaudeMessagesToResponsesPolicy{
 		Enabled:     false,
 		AllChannels: true,
 	},

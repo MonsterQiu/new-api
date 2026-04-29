@@ -72,10 +72,24 @@ const chatCompletionsToResponsesPolicyAllChannelsExample = JSON.stringify(
   2,
 );
 
+const claudeMessagesToResponsesPolicyExample = JSON.stringify(
+  {
+    enabled: true,
+    all_channels: true,
+    model_patterns: ['^claude-opus-4\\.7$', '^claude-sonnet-4\\.6$'],
+    groups: ['claude_code'],
+    only_non_stream: true,
+    force_upstream_stream: true,
+  },
+  null,
+  2,
+);
+
 const defaultGlobalSettingInputs = {
   'global.pass_through_request_enabled': false,
   'global.thinking_model_blacklist': '[]',
   'global.chat_completions_to_responses_policy': '{}',
+  'global.claude_messages_to_responses_policy': '{}',
   'general_setting.ping_interval_enabled': false,
   'general_setting.ping_interval_seconds': 60,
 };
@@ -89,6 +103,8 @@ export default function SettingGlobalModel(props) {
   const [inputsRow, setInputsRow] = useState(defaultGlobalSettingInputs);
   const chatCompletionsToResponsesPolicyKey =
     'global.chat_completions_to_responses_policy';
+  const claudeMessagesToResponsesPolicyKey =
+    'global.claude_messages_to_responses_policy';
 
   const setChatCompletionsToResponsesPolicyValue = (value) => {
     setInputs((prev) => ({
@@ -106,6 +122,10 @@ export default function SettingGlobalModel(props) {
       return text === '' ? '[]' : value;
     }
     if (key === 'global.chat_completions_to_responses_policy') {
+      const text = typeof value === 'string' ? value.trim() : '';
+      return text === '' ? '{}' : value;
+    }
+    if (key === 'global.claude_messages_to_responses_policy') {
       const text = typeof value === 'string' ? value.trim() : '';
       return text === '' ? '{}' : value;
     }
@@ -163,6 +183,16 @@ export default function SettingGlobalModel(props) {
           }
         }
         if (key === 'global.chat_completions_to_responses_policy') {
+          try {
+            value =
+              value && String(value).trim() !== ''
+                ? JSON.stringify(JSON.parse(value), null, 2)
+                : defaultGlobalSettingInputs[key];
+          } catch (error) {
+            value = defaultGlobalSettingInputs[key];
+          }
+        }
+        if (key === 'global.claude_messages_to_responses_policy') {
           try {
             value =
               value && String(value).trim() !== ''
@@ -349,6 +379,130 @@ export default function SettingGlobalModel(props) {
                             2,
                           );
                           setChatCompletionsToResponsesPolicyValue(formatted);
+                        } catch (error) {
+                          showError(t('不是合法的 JSON 字符串'));
+                        }
+                      }}
+                    >
+                      {t('格式化 JSON')}
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
+            </Form.Section>
+
+            <Form.Section
+              text={
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {t('Claude Messages→Responses 兼容配置')}
+                  <Tag color='orange' size='small'>
+                    测试版
+                  </Tag>
+                </span>
+              }
+            >
+              <Row style={{ marginTop: 10 }}>
+                <Col span={24}>
+                  <Banner
+                    type='warning'
+                    description={t(
+                      '提示：仅在命中模型、渠道和分组时，将 /v1/messages 转为 /v1/responses，适合 Claude Code 使用 Codex/Responses 渠道。',
+                    )}
+                  />
+                </Col>
+              </Row>
+
+              <Row style={{ marginTop: 10 }}>
+                <Col span={24}>
+                  <Form.TextArea
+                    label={t('参数配置')}
+                    field={claudeMessagesToResponsesPolicyKey}
+                    placeholder={
+                      t('例如：') +
+                      '\n' +
+                      claudeMessagesToResponsesPolicyExample
+                    }
+                    rows={8}
+                    rules={[
+                      {
+                        validator: (rule, value) => {
+                          if (!value || value.trim() === '') return true;
+                          return verifyJSON(value);
+                        },
+                        message: t('不是合法的 JSON 字符串'),
+                      },
+                    ]}
+                    onChange={(value) =>
+                      setInputs((prev) => ({
+                        ...prev,
+                        [claudeMessagesToResponsesPolicyKey]: value,
+                      }))
+                    }
+                  />
+                </Col>
+              </Row>
+
+              <Row style={{ marginTop: 10, marginBottom: 16 }}>
+                <Col span={24}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Button
+                      type='secondary'
+                      size='small'
+                      onClick={() => {
+                        setInputs((prev) => ({
+                          ...prev,
+                          [claudeMessagesToResponsesPolicyKey]:
+                            claudeMessagesToResponsesPolicyExample,
+                        }));
+                        if (refForm.current) {
+                          refForm.current.setValue(
+                            claudeMessagesToResponsesPolicyKey,
+                            claudeMessagesToResponsesPolicyExample,
+                          );
+                        }
+                      }}
+                    >
+                      {t('填充 Claude Code 模板')}
+                    </Button>
+                    <Button
+                      type='secondary'
+                      size='small'
+                      onClick={() => {
+                        const raw =
+                          inputs[claudeMessagesToResponsesPolicyKey];
+                        if (!raw || String(raw).trim() === '') return;
+                        try {
+                          const formatted = JSON.stringify(
+                            JSON.parse(raw),
+                            null,
+                            2,
+                          );
+                          setInputs((prev) => ({
+                            ...prev,
+                            [claudeMessagesToResponsesPolicyKey]: formatted,
+                          }));
+                          if (refForm.current) {
+                            refForm.current.setValue(
+                              claudeMessagesToResponsesPolicyKey,
+                              formatted,
+                            );
+                          }
                         } catch (error) {
                           showError(t('不是合法的 JSON 字符串'));
                         }
