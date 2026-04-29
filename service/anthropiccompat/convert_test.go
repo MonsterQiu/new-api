@@ -21,9 +21,10 @@ func TestClaudeRequestToResponsesRequestConvertsToolsAndToolMessages(t *testing.
 		Content:   "package main",
 	}
 	req := &dto.ClaudeRequest{
-		Model:    "gpt-5.4",
-		System:   "You are concise.",
-		Metadata: mustRaw(t, map[string]any{"user_id": "user_123"}),
+		Model:             "gpt-5.4",
+		System:            "You are concise.",
+		Metadata:          mustRaw(t, map[string]any{"user_id": "user_123"}),
+		ContextManagement: mustRaw(t, map[string]any{"edits": map[string]any{"type": "clear"}}),
 		Tools: []map[string]any{
 			{
 				"name":        "read_file",
@@ -85,6 +86,9 @@ func TestClaudeRequestToResponsesRequestConvertsToolsAndToolMessages(t *testing.
 	}
 	if len(responsesReq.User) != 0 {
 		t.Fatalf("expected Claude metadata.user_id not to be forwarded to Responses user, got %s", string(responsesReq.User))
+	}
+	if len(responsesReq.ContextManagement) != 0 {
+		t.Fatalf("expected Claude context_management not to be forwarded to Responses context_management, got %s", string(responsesReq.ContextManagement))
 	}
 }
 

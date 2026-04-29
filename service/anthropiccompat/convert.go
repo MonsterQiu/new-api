@@ -39,16 +39,15 @@ func ClaudeRequestToResponsesRequest(req *dto.ClaudeRequest) (*dto.OpenAIRespons
 	}
 
 	out := &dto.OpenAIResponsesRequest{
-		Model:             req.Model,
-		Input:             inputRaw,
-		Instructions:      claudeSystemToResponsesInstructions(req),
-		MaxOutputTokens:   req.MaxTokens,
-		ContextManagement: req.ContextManagement,
-		ServiceTier:       req.ServiceTier,
-		Stream:            req.Stream,
-		Temperature:       req.Temperature,
-		TopP:              req.TopP,
-		Tools:             claudeToolsToResponsesTools(req.Tools),
+		Model:           req.Model,
+		Input:           inputRaw,
+		Instructions:    claudeSystemToResponsesInstructions(req),
+		MaxOutputTokens: req.MaxTokens,
+		ServiceTier:     req.ServiceTier,
+		Stream:          req.Stream,
+		Temperature:     req.Temperature,
+		TopP:            req.TopP,
+		Tools:           claudeToolsToResponsesTools(req.Tools),
 	}
 
 	toolChoice, parallelToolCalls := claudeToolChoiceToResponses(req.ToolChoice)
