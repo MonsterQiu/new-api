@@ -83,12 +83,8 @@ func TestClaudeRequestToResponsesRequestConvertsToolsAndToolMessages(t *testing.
 	if len(responsesReq.Metadata) != 0 {
 		t.Fatalf("expected Claude metadata not to be forwarded to Responses metadata, got %s", string(responsesReq.Metadata))
 	}
-	var user string
-	if err := common.Unmarshal(responsesReq.User, &user); err != nil {
-		t.Fatalf("unmarshal user: %v", err)
-	}
-	if user != "user_123" {
-		t.Fatalf("expected metadata.user_id to map to user, got %q", user)
+	if len(responsesReq.User) != 0 {
+		t.Fatalf("expected Claude metadata.user_id not to be forwarded to Responses user, got %s", string(responsesReq.User))
 	}
 }
 

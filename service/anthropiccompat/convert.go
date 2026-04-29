@@ -55,12 +55,6 @@ func ClaudeRequestToResponsesRequest(req *dto.ClaudeRequest) (*dto.OpenAIRespons
 	out.ToolChoice = toolChoice
 	out.ParallelToolCalls = parallelToolCalls
 
-	if req.Metadata != nil {
-		if userRaw := claudeMetadataUserRaw(req.Metadata); len(userRaw) > 0 {
-			out.User = userRaw
-		}
-	}
-
 	if effort := req.GetEfforts(); effort != "" {
 		out.Reasoning = &dto.Reasoning{Effort: effort, Summary: "detailed"}
 	} else if req.Thinking != nil && strings.TrimSpace(req.Thinking.Type) != "" {
@@ -304,19 +298,6 @@ func claudeToolChoiceToResponses(toolChoice any) ([]byte, []byte) {
 
 	raw, _ := common.Marshal(toolChoice)
 	return raw, parallelToolCalls
-}
-
-func claudeMetadataUserRaw(metadata []byte) []byte {
-	var m map[string]any
-	if err := common.Unmarshal(metadata, &m); err != nil {
-		return nil
-	}
-	userID := strings.TrimSpace(common.Interface2String(m["user_id"]))
-	if userID == "" {
-		return nil
-	}
-	raw, _ := common.Marshal(userID)
-	return raw
 }
 
 func jsonArgumentString(v any) string {
