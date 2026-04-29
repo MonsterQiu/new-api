@@ -53,7 +53,7 @@ func claudeMessagesViaResponses(c *gin.Context, info *relaycommon.RelayInfo, ada
 	if forceUpstreamStream {
 		responsesReq.Stream = common.GetPointer(true)
 	}
-	injectClaudeMessagesPromptCacheKey(c, responsesReq)
+	injectClaudeMessagesPromptCacheKey(c, info, &overriddenClaudeReq, responsesReq)
 	info.AppendRequestConversion(types.RelayFormatOpenAIResponses)
 
 	savedRelayMode := info.RelayMode
@@ -128,9 +128,37 @@ func claudeMessagesViaResponses(c *gin.Context, info *relaycommon.RelayInfo, ada
 	return usage, nil
 }
 
-func injectClaudeMessagesPromptCacheKey(c *gin.Context, request *dto.OpenAIResponsesRequest) {
+func injectClaudeMessagesPromptCacheKey(c *gin.Context, info *relaycommon.RelayInfo, claudeReq *dto.ClaudeRequest, request *dto.OpenAIResponsesRequest) {
 	if request == nil || len(request.PromptCacheKey) > 0 {
 		return
+	}
+	if value := claudeMessagesPromptCacheKeyFromHeaders(c); value != "" {
+		raw, err := common.Marshal(value)
+		if err != nil {
+			return
+		}
+		request.PromptCacheKey = raw
+		return
+	}
+
+	if !shouldAutoInjectClaudeMessagesPromptCacheKey(request.Model) {
+		return
+	}
+
+	key := deriveClaudeMessagesPromptCacheKey(info, claudeReq, request.Model)
+	if key == "" {
+		return
+	}
+	raw, err := common.Marshal(key)
+	if err != nil {
+		return
+	}
+	request.PromptCacheKey = raw
+}
+
+func claudeMessagesPromptCacheKeyFromHeaders(c *gin.Context) string {
+	if c == nil {
+		return ""
 	}
 	for _, header := range []string{
 		"prompt_cache_key",
@@ -141,17 +169,92 @@ func injectClaudeMessagesPromptCacheKey(c *gin.Context, request *dto.OpenAIRespo
 		"Conversation_ID",
 		"x-session-id",
 	} {
-		value := strings.TrimSpace(c.GetHeader(header))
-		if value == "" {
+		if value := strings.TrimSpace(c.GetHeader(header)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func shouldAutoInjectClaudeMessagesPromptCacheKey(model string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	return strings.Contains(normalized, "gpt-5") || strings.Contains(normalized, "codex")
+}
+
+func deriveClaudeMessagesPromptCacheKey(info *relaycommon.RelayInfo, req *dto.ClaudeRequest, model string) string {
+	if req == nil {
+		return ""
+	}
+
+	seedParts := []string{"model=" + strings.ToLower(strings.TrimSpace(model))}
+	if info != nil {
+		if info.UserId > 0 {
+			seedParts = append(seedParts, fmt.Sprintf("user_id=%d", info.UserId))
+		} else if info.TokenId > 0 {
+			seedParts = append(seedParts, fmt.Sprintf("token_id=%d", info.TokenId))
+		}
+	}
+	if system := normalizeClaudeMessagesCacheSeedValue(req.System); system != "" {
+		seedParts = append(seedParts, "system="+system)
+	}
+	if tools := normalizeClaudeMessagesCacheSeedValue(req.Tools); tools != "" {
+		seedParts = append(seedParts, "tools="+tools)
+	}
+	if toolChoice := normalizeClaudeMessagesCacheSeedValue(req.ToolChoice); toolChoice != "" {
+		seedParts = append(seedParts, "tool_choice="+toolChoice)
+	}
+	if req.OutputConfig != nil {
+		if outputConfig := normalizeClaudeMessagesCacheSeedRaw(req.OutputConfig); outputConfig != "" {
+			seedParts = append(seedParts, "output_config="+outputConfig)
+		}
+	}
+	if req.Thinking != nil {
+		if thinking := normalizeClaudeMessagesCacheSeedValue(req.Thinking); thinking != "" {
+			seedParts = append(seedParts, "thinking="+thinking)
+		}
+	}
+	if firstUser := firstClaudeMessagesUserCacheSeed(req.Messages); firstUser != "" {
+		seedParts = append(seedParts, "first_user="+firstUser)
+	}
+
+	return "claude_cc_" + common.Sha1(common.StringToByteSlice(strings.Join(seedParts, "|")))
+}
+
+func firstClaudeMessagesUserCacheSeed(messages []dto.ClaudeMessage) string {
+	for _, message := range messages {
+		role := strings.TrimSpace(message.Role)
+		if role != "" && role != "user" {
 			continue
 		}
-		raw, err := common.Marshal(value)
-		if err != nil {
-			return
-		}
-		request.PromptCacheKey = raw
-		return
+		return normalizeClaudeMessagesCacheSeedValue(message.Content)
 	}
+	return ""
+}
+
+func normalizeClaudeMessagesCacheSeedValue(value any) string {
+	if value == nil {
+		return ""
+	}
+	raw, err := common.Marshal(value)
+	if err != nil {
+		return common.Interface2String(value)
+	}
+	return normalizeClaudeMessagesCacheSeedRaw(raw)
+}
+
+func normalizeClaudeMessagesCacheSeedRaw(raw []byte) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var value any
+	if err := common.Unmarshal(raw, &value); err != nil {
+		return string(raw)
+	}
+	normalized, err := common.Marshal(value)
+	if err != nil {
+		return string(raw)
+	}
+	return string(normalized)
 }
 
 func responsesToClaudeHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
