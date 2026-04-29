@@ -21,8 +21,9 @@ func TestClaudeRequestToResponsesRequestConvertsToolsAndToolMessages(t *testing.
 		Content:   "package main",
 	}
 	req := &dto.ClaudeRequest{
-		Model:  "gpt-5.4",
-		System: "You are concise.",
+		Model:    "gpt-5.4",
+		System:   "You are concise.",
+		Metadata: mustRaw(t, map[string]any{"user_id": "user_123"}),
 		Tools: []map[string]any{
 			{
 				"name":        "read_file",
@@ -79,6 +80,16 @@ func TestClaudeRequestToResponsesRequestConvertsToolsAndToolMessages(t *testing.
 	if input[2]["type"] != "function_call_output" || input[2]["call_id"] != "toolu_1" || input[2]["output"] != "package main" {
 		t.Fatalf("unexpected function_call_output item: %#v", input[2])
 	}
+	if len(responsesReq.Metadata) != 0 {
+		t.Fatalf("expected Claude metadata not to be forwarded to Responses metadata, got %s", string(responsesReq.Metadata))
+	}
+	var user string
+	if err := common.Unmarshal(responsesReq.User, &user); err != nil {
+		t.Fatalf("unmarshal user: %v", err)
+	}
+	if user != "user_123" {
+		t.Fatalf("expected metadata.user_id to map to user, got %q", user)
+	}
 }
 
 func TestResponsesResponseToClaudeResponseConvertsFunctionCallAndCacheUsage(t *testing.T) {
@@ -126,4 +137,13 @@ func TestResponsesResponseToClaudeResponseConvertsFunctionCallAndCacheUsage(t *t
 	if usage == nil || usage.UsageSemantic != UsageSemanticAnthropic || usage.PromptTokens != 60 {
 		t.Fatalf("unexpected billing usage: %#v", usage)
 	}
+}
+
+func mustRaw(t *testing.T, v any) []byte {
+	t.Helper()
+	raw, err := common.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal raw test value: %v", err)
+	}
+	return raw
 }

@@ -44,7 +44,6 @@ func ClaudeRequestToResponsesRequest(req *dto.ClaudeRequest) (*dto.OpenAIRespons
 		Instructions:      claudeSystemToResponsesInstructions(req),
 		MaxOutputTokens:   req.MaxTokens,
 		ContextManagement: req.ContextManagement,
-		Metadata:          req.Metadata,
 		ServiceTier:       req.ServiceTier,
 		Stream:            req.Stream,
 		Temperature:       req.Temperature,
