@@ -54,7 +54,7 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
         text: t('作图工具'),
         itemKey: 'drawingTool',
         isExternal: true,
-        externalLink: 'https://draw.ymsunv.com',
+        externalLink: 'http://raincanvas.im/',
       },
       ...(docsLink
         ? [
