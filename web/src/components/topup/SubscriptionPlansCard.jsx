@@ -486,7 +486,7 @@ const SubscriptionPlansCard = ({
 
           {/* 可购买套餐 - 标准定价卡片 */}
           {plans.length > 0 ? (
-            <div className='grid grid-cols-1 gap-4 w-full px-1'>
+            <div className='grid grid-cols-1 gap-3 w-full px-1 md:grid-cols-2 2xl:grid-cols-3'>
               {plans.map((p, index) => {
                 const plan = p?.plan;
                 const purchaseUserCount = Number(p?.purchase_user_count || 0);
@@ -554,10 +554,10 @@ const SubscriptionPlansCard = ({
                     }`}
                     bodyStyle={{ padding: 0 }}
                   >
-                    <div className='p-4 h-full flex flex-col'>
+                    <div className='p-3 h-full flex flex-col'>
                       {/* 推荐标签 */}
                       {isPopular && (
-                        <div className='mb-2'>
+                        <div className='mb-1'>
                           <Tag color='purple' shape='circle' size='small'>
                             <Sparkles size={10} className='mr-1' />
                             {t('推荐')}
@@ -565,9 +565,9 @@ const SubscriptionPlansCard = ({
                         </div>
                       )}
                       {/* 套餐名称 */}
-                      <div className='mb-3'>
+                      <div className='mb-2'>
                         <Typography.Title
-                          heading={4}
+                          heading={5}
                           ellipsis={{ rows: 1, showTooltip: true }}
                           style={{ margin: 0 }}
                         >
@@ -578,18 +578,19 @@ const SubscriptionPlansCard = ({
                             type='secondary'
                             style={{
                               display: 'block',
-                              marginTop: 8,
-                              fontSize: 14,
-                              lineHeight: '22px',
+                              marginTop: 4,
+                              fontSize: 13,
+                              lineHeight: '20px',
                               fontWeight: 500,
                               color: 'var(--semi-color-text-1)',
                               opacity: 0.92,
                             }}
+                            ellipsis={{ rows: 2, showTooltip: true }}
                           >
                             {plan.subtitle}
                           </Text>
                         )}
-                        <div className='mt-2 flex flex-wrap items-center gap-2'>
+                        <div className='mt-2 flex flex-wrap items-center gap-1.5'>
                           <Tag color='cyan' shape='circle' size='small'>
                             {t('购买人数 {{count}}', {
                               count: purchaseUserCount,
@@ -618,22 +619,27 @@ const SubscriptionPlansCard = ({
                       </div>
 
                       {/* 价格区域 */}
-                      <div className='py-2'>
+                      <div className='py-1.5'>
                         {paymentDisplays.length > 1 ? (
-                          <div className='space-y-2'>
+                          <div className='space-y-1.5'>
                             {paymentDisplays.map((paymentDisplay) => (
                               <div
                                 key={`${plan?.id}-${paymentDisplay.currency}-${paymentDisplay.formattedAmount}-${paymentDisplay.label}`}
-                                className='flex items-center justify-between gap-3 rounded-lg bg-slate-50/80 px-3 py-2 dark:bg-slate-800/80'
+                                className='flex min-w-0 items-center justify-between gap-2 rounded-lg bg-slate-50/80 px-2.5 py-1.5 dark:bg-slate-800/80'
                               >
-                                <Text type='secondary' size='small'>
+                                <Text
+                                  type='secondary'
+                                  size='small'
+                                  ellipsis={{ showTooltip: true }}
+                                  style={{ maxWidth: '55%' }}
+                                >
                                   {paymentDisplay.label}
                                 </Text>
-                                <div className='flex items-baseline gap-1'>
-                                  <span className='text-base font-bold text-purple-600'>
+                                <div className='flex shrink-0 items-baseline gap-1'>
+                                  <span className='text-sm font-bold text-purple-600'>
                                     {paymentDisplay.symbol}
                                   </span>
-                                  <span className='text-2xl font-bold text-purple-600'>
+                                  <span className='text-xl font-bold text-purple-600'>
                                     {paymentDisplay.formattedAmount}
                                   </span>
                                 </div>
@@ -643,10 +649,10 @@ const SubscriptionPlansCard = ({
                         ) : (
                           <div>
                             <div className='flex items-baseline justify-start'>
-                              <span className='text-xl font-bold text-purple-600'>
+                              <span className='text-lg font-bold text-purple-600'>
                                 {primaryPaymentDisplay?.symbol}
                               </span>
-                              <span className='text-3xl font-bold text-purple-600'>
+                              <span className='text-2xl font-bold text-purple-600'>
                                 {primaryPaymentDisplay?.formattedAmount}
                               </span>
                             </div>
@@ -654,7 +660,7 @@ const SubscriptionPlansCard = ({
                               <Text
                                 type='tertiary'
                                 size='small'
-                                style={{ display: 'block', marginTop: 6 }}
+                                style={{ display: 'block', marginTop: 4 }}
                               >
                                 {primaryPaymentDisplay.label}
                               </Text>
@@ -664,12 +670,14 @@ const SubscriptionPlansCard = ({
                       </div>
 
                       {/* 套餐权益描述 */}
-                      <div className='flex flex-col items-start gap-1 pb-2'>
+                      <div className='flex flex-col items-start gap-0.5 pb-1'>
                         {planBenefits.map((item) => {
                           const content = (
-                            <div className='flex items-center gap-2 text-xs text-gray-500'>
+                            <div className='flex w-full min-w-0 items-center gap-1.5 text-xs text-gray-500'>
                               <Badge dot type='tertiary' />
-                              <span>{item.label}</span>
+                              <span className='min-w-0 flex-1 truncate'>
+                                {item.label}
+                              </span>
                             </div>
                           );
                           if (!item.tooltip) {
