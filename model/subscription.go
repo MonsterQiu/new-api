@@ -987,6 +987,25 @@ func (r *SubscriptionPreConsumeRecord) BeforeUpdate(tx *gorm.DB) error {
 	return nil
 }
 
+func normalizeExcludedSubscriptionPlanIDs(ids []int) []int {
+	if len(ids) == 0 {
+		return nil
+	}
+	seen := make(map[int]struct{}, len(ids))
+	normalized := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		normalized = append(normalized, id)
+	}
+	return normalized
+}
+
 func maybeResetUserSubscriptionWithPlanTx(tx *gorm.DB, sub *UserSubscription, plan *SubscriptionPlan, now int64) error {
 	if tx == nil || sub == nil || plan == nil {
 		return errors.New("invalid reset args")
@@ -1025,6 +1044,12 @@ func maybeResetUserSubscriptionWithPlanTx(tx *gorm.DB, sub *UserSubscription, pl
 
 // PreConsumeUserSubscription pre-consumes from any active subscription total quota.
 func PreConsumeUserSubscription(requestId string, userId int, modelName string, quotaType int, amount int64) (*SubscriptionPreConsumeResult, error) {
+	return PreConsumeUserSubscriptionWithExcludedPlanIDs(requestId, userId, modelName, quotaType, amount, nil)
+}
+
+// PreConsumeUserSubscriptionWithExcludedPlanIDs pre-consumes from active subscriptions,
+// skipping configured plan IDs for model-specific billing restrictions.
+func PreConsumeUserSubscriptionWithExcludedPlanIDs(requestId string, userId int, modelName string, quotaType int, amount int64, excludedPlanIDs []int) (*SubscriptionPreConsumeResult, error) {
 	if userId <= 0 {
 		return nil, errors.New("invalid userId")
 	}
@@ -1060,11 +1085,15 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 			return nil
 		}
 
+		excludedPlanIDs = normalizeExcludedSubscriptionPlanIDs(excludedPlanIDs)
 		var subs []UserSubscription
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		subQuery := tx.Set("gorm:query_option", "FOR UPDATE").
 			Where("user_id = ? AND status = ? AND end_time > ?", userId, "active", now).
-			Order("end_time asc, id asc").
-			Find(&subs).Error; err != nil {
+			Order("end_time asc, id asc")
+		if len(excludedPlanIDs) > 0 {
+			subQuery = subQuery.Where("plan_id NOT IN ?", excludedPlanIDs)
+		}
+		if err := subQuery.Find(&subs).Error; err != nil {
 			return errors.New("no active subscription")
 		}
 		if len(subs) == 0 {

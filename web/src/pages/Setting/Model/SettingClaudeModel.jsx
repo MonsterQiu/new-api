@@ -56,6 +56,17 @@ const CLAUDE_DEFAULT_MAX_TOKENS = {
   'claude-3-7-sonnet-20250219-thinking': 8192,
 };
 
+const CLAUDE_EXCLUDED_SUBSCRIPTION_PLAN_IDS = [1, 2, 3, 4, 6, 7];
+
+function verifyPositiveIntegerArray(value) {
+  if (!verifyJSON(value)) return false;
+  const parsed = JSON.parse(value);
+  return (
+    Array.isArray(parsed) &&
+    parsed.every((item) => Number.isInteger(item) && item > 0)
+  );
+}
+
 export default function SettingClaudeModel(props) {
   const { t } = useTranslation();
 
@@ -65,6 +76,7 @@ export default function SettingClaudeModel(props) {
     'claude.thinking_adapter_enabled': true,
     'claude.default_max_tokens': '',
     'claude.thinking_adapter_budget_tokens_percentage': 0.8,
+    'claude.excluded_subscription_plan_ids': '[]',
   });
   const refForm = useRef();
   const [inputsRow, setInputsRow] = useState(inputs);
@@ -191,6 +203,42 @@ export default function SettingClaudeModel(props) {
                   ]}
                   onChange={(value) =>
                     setInputs({ ...inputs, 'claude.default_max_tokens': value })
+                  }
+                />
+              </Col>
+            </Row>
+            <Row>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.TextArea
+                  label={t('Claude订阅扣费排除套餐ID')}
+                  field={'claude.excluded_subscription_plan_ids'}
+                  placeholder={
+                    t('为一个 JSON 数组，例如：') +
+                    '\n' +
+                    JSON.stringify(
+                      CLAUDE_EXCLUDED_SUBSCRIPTION_PLAN_IDS,
+                      null,
+                      2,
+                    )
+                  }
+                  extraText={t(
+                    'Claude请求使用订阅额度扣费时会跳过这些套餐ID；留空数组表示不排除。',
+                  )}
+                  autosize={{ minRows: 4, maxRows: 8 }}
+                  trigger='blur'
+                  stopValidateWithError
+                  rules={[
+                    {
+                      validator: (rule, value) =>
+                        verifyPositiveIntegerArray(value),
+                      message: t('必须是正整数 JSON 数组'),
+                    },
+                  ]}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      'claude.excluded_subscription_plan_ids': value,
+                    })
                   }
                 />
               </Col>

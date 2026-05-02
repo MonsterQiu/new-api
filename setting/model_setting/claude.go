@@ -19,6 +19,7 @@ type ClaudeSettings struct {
 	DefaultMaxTokens                      map[string]int                 `json:"default_max_tokens"`
 	ThinkingAdapterEnabled                bool                           `json:"thinking_adapter_enabled"`
 	ThinkingAdapterBudgetTokensPercentage float64                        `json:"thinking_adapter_budget_tokens_percentage"`
+	ExcludedSubscriptionPlanIDs           []int                          `json:"excluded_subscription_plan_ids"`
 }
 
 // 默认配置
@@ -29,6 +30,7 @@ var defaultClaudeSettings = ClaudeSettings{
 		"default": 8192,
 	},
 	ThinkingAdapterBudgetTokensPercentage: 0.8,
+	ExcludedSubscriptionPlanIDs:           []int{},
 }
 
 // 全局实例
@@ -45,7 +47,68 @@ func GetClaudeSettings() *ClaudeSettings {
 	if _, ok := claudeSettings.DefaultMaxTokens["default"]; !ok {
 		claudeSettings.DefaultMaxTokens["default"] = 8192
 	}
+	claudeSettings.ExcludedSubscriptionPlanIDs = normalizeSubscriptionPlanIDs(claudeSettings.ExcludedSubscriptionPlanIDs)
 	return &claudeSettings
+}
+
+func IsClaudeModelName(modelName string) bool {
+	modelName = strings.ToLower(strings.TrimSpace(modelName))
+	if modelName == "" {
+		return false
+	}
+	modelName = strings.TrimSuffix(modelName, "-thinking")
+	if strings.HasPrefix(modelName, "claude-") {
+		return true
+	}
+	if strings.HasPrefix(modelName, "anthropic/claude-") {
+		return true
+	}
+	if strings.HasPrefix(modelName, "anthropic.claude-") {
+		return true
+	}
+	return false
+}
+
+func GetClaudeExcludedSubscriptionPlanIDsForModel(modelName string) []int {
+	if !IsClaudeModelName(modelName) {
+		return nil
+	}
+	return GetClaudeExcludedSubscriptionPlanIDs()
+}
+
+func GetClaudeExcludedSubscriptionPlanIDs() []int {
+	return copySubscriptionPlanIDs(GetClaudeSettings().ExcludedSubscriptionPlanIDs)
+}
+
+func copySubscriptionPlanIDs(ids []int) []int {
+	if len(ids) == 0 {
+		return nil
+	}
+	copied := make([]int, len(ids))
+	copy(copied, ids)
+	return copied
+}
+
+func normalizeSubscriptionPlanIDs(ids []int) []int {
+	if len(ids) == 0 {
+		return []int{}
+	}
+	seen := make(map[int]struct{}, len(ids))
+	normalized := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		normalized = append(normalized, id)
+	}
+	if len(normalized) == 0 {
+		return []int{}
+	}
+	return normalized
 }
 
 func (c *ClaudeSettings) WriteHeaders(originModel string, httpHeader *http.Header) {

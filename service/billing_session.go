@@ -7,9 +7,11 @@ import (
 	"sync"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/bytedance/gopkg/util/gopool"
@@ -384,10 +386,11 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 		session := &BillingSession{
 			relayInfo: relayInfo,
 			funding: &SubscriptionFunding{
-				requestId: relayInfo.RequestId,
-				userId:    relayInfo.UserId,
-				modelName: relayInfo.OriginModelName,
-				amount:    subConsume,
+				requestId:       relayInfo.RequestId,
+				userId:          relayInfo.UserId,
+				modelName:       relayInfo.OriginModelName,
+				amount:          subConsume,
+				excludedPlanIDs: excludedSubscriptionPlanIDsForRelay(relayInfo),
 			},
 		}
 		// 必须传 subConsume 而非 preConsumedQuota，保证 SubscriptionFunding.amount、
@@ -431,4 +434,22 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 		}
 		return session, nil
 	}
+}
+
+func excludedSubscriptionPlanIDsForRelay(relayInfo *relaycommon.RelayInfo) []int {
+	if relayInfo == nil {
+		return nil
+	}
+	if ids := model_setting.GetClaudeExcludedSubscriptionPlanIDsForModel(relayInfo.OriginModelName); len(ids) > 0 {
+		return ids
+	}
+	if relayInfo.ChannelMeta != nil {
+		if ids := model_setting.GetClaudeExcludedSubscriptionPlanIDsForModel(relayInfo.ChannelMeta.UpstreamModelName); len(ids) > 0 {
+			return ids
+		}
+		if relayInfo.ChannelMeta.ChannelType == constant.ChannelTypeAnthropic {
+			return model_setting.GetClaudeExcludedSubscriptionPlanIDs()
+		}
+	}
+	return nil
 }
