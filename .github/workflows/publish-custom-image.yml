@@ -85,9 +85,12 @@ jobs:
           echo "Published image: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
 
   deploy-prod:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Keep automatic production deploys available for this repository, but do
+    # not let public forks or copied workflows target the production runner.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'MonsterQiu/new-api'
     needs: docker
     runs-on: [self-hosted, linux, x64, prod, new-api]
+    environment: production
     timeout-minutes: 15
     concurrency:
       group: production-deploy

@@ -13,6 +13,8 @@ jobs:
   pr-quality:
     runs-on: ubuntu-latest
     steps:
+      # Security invariant: this pull_request_target workflow must not checkout
+      # or execute PR code. It only inspects PR metadata using read permissions.
       - uses: peakoss/anti-slop@v0.2.1
         with:
           max-failures: 4

@@ -10,7 +10,11 @@ on:
 
 jobs:
   release-and-deploy:
+    # Manual production deploys are intentionally scoped to the canonical
+    # repository so public forks cannot reuse this workflow against prod.
+    if: github.repository == 'MonsterQiu/new-api'
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
       packages: write
