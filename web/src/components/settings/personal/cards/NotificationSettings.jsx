@@ -76,6 +76,7 @@ const NotificationSettings = ({
       log: true,
       midjourney: true,
       task: true,
+      drawingTool: true,
     },
     personal: {
       enabled: true,
@@ -164,6 +165,7 @@ const NotificationSettings = ({
         log: true,
         midjourney: true,
         task: true,
+        drawingTool: true,
       },
       personal: { enabled: true, topup: true, personal: true },
       admin: {
@@ -271,6 +273,11 @@ const NotificationSettings = ({
           description: t('绘图任务记录'),
         },
         { key: 'task', title: t('任务日志'), description: t('系统任务记录') },
+        {
+          key: 'drawingTool',
+          title: t('作图工具'),
+          description: t('一键跳转到作图工具'),
+        },
       ],
     },
     {

@@ -51,6 +51,10 @@ const routerMap = {
   personal: '/console/personal',
 };
 
+const externalLinkMap = {
+  drawingTool: 'http://raincanvas.im/',
+};
+
 const SiderBar = ({ onNavigate = () => {} }) => {
   const { t } = useTranslation();
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
@@ -104,6 +108,11 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         to: '/task',
         className:
           localStorage.getItem('enable_task') === 'true' ? '' : 'tableHiddle',
+      },
+      {
+        text: t('作图工具'),
+        itemKey: 'drawingTool',
+        externalLink: externalLinkMap.drawingTool,
       },
     ];
 
@@ -410,6 +419,21 @@ const SiderBar = ({ onNavigate = () => {} }) => {
           hoverStyle='sidebar-nav-item:hover'
           selectedStyle='sidebar-nav-item-selected'
           renderWrapper={({ itemElement, props }) => {
+            const externalLink = externalLinkMap[props.itemKey];
+            if (externalLink) {
+              return (
+                <a
+                  href={externalLink}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  style={{ textDecoration: 'none' }}
+                  onClick={onNavigate}
+                >
+                  {itemElement}
+                </a>
+              );
+            }
+
             const to =
               routerMapState[props.itemKey] || routerMap[props.itemKey];
 
