@@ -81,6 +81,7 @@ const NotificationSettings = ({
     personal: {
       enabled: true,
       topup: true,
+      aff: true,
       personal: true,
     },
     admin: {
@@ -167,7 +168,7 @@ const NotificationSettings = ({
         task: true,
         drawingTool: true,
       },
-      personal: { enabled: true, topup: true, personal: true },
+      personal: { enabled: true, topup: true, aff: true, personal: true },
       admin: {
         enabled: true,
         channel: true,
@@ -286,6 +287,11 @@ const NotificationSettings = ({
       description: t('用户个人功能'),
       modules: [
         { key: 'topup', title: t('钱包管理'), description: t('余额充值管理') },
+        {
+          key: 'aff',
+          title: t('邀请返利'),
+          description: t('邀请返利额度与明细'),
+        },
         {
           key: 'personal',
           title: t('个人设置'),
@@ -485,7 +491,10 @@ const NotificationSettings = ({
                     checkedText={t('开')}
                     uncheckedText={t('关')}
                     onChange={(value) =>
-                      handleFormChange('upstreamModelUpdateNotifyEnabled', value)
+                      handleFormChange(
+                        'upstreamModelUpdateNotifyEnabled',
+                        value,
+                      )
                     }
                     extraText={t(
                       '仅管理员可用。开启后，当系统定时检测全部渠道发现上游模型变更或检测异常时，将按你选择的通知方式发送汇总通知；渠道或模型过多时会自动省略部分明细。',

@@ -6,6 +6,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/setting"
 
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -100,7 +101,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		return errors.New("未提供支付单号")
 	}
 
-	var quota float64
+	var quotaToAdd int
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
@@ -129,15 +130,30 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 			return err
 		}
 
-		quota = topUp.Money * common.QuotaPerUnit
+		quotaToAdd = int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+		if quotaToAdd <= 0 {
+			return errors.New("无效的充值额度")
+		}
 		updates := map[string]interface{}{
-			"quota": gorm.Expr("quota + ?", quota),
+			"quota": gorm.Expr("quota + ?", quotaToAdd),
 		}
 		if customerId != "" {
 			updates["stripe_customer"] = customerId
 		}
 		err = tx.Model(&User{}).Where("id = ?", topUp.UserId).Updates(updates).Error
 		if err != nil {
+			return err
+		}
+
+		if _, err = GrantInviteRebateTx(tx, InviteRebateGrantParams{
+			InviteeId:     topUp.UserId,
+			SourceType:    InviteRebateSourceTopUp,
+			SourceId:      topUp.TradeNo,
+			PaymentMethod: topUp.PaymentMethod,
+			BaseQuota:     quotaToAdd,
+			BaseAmount:    topUp.Money,
+			Currency:      "USD",
+		}); err != nil {
 			return err
 		}
 
@@ -149,7 +165,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		return errors.New("充值失败，请稍后重试")
 	}
 
-	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%d", logger.FormatQuota(int(quota)), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentMethodStripe)
+	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%d", logger.FormatQuota(quotaToAdd), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentMethodStripe)
 
 	return nil
 }
@@ -370,6 +386,18 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 			return err
 		}
 
+		if _, err := GrantInviteRebateTx(tx, InviteRebateGrantParams{
+			InviteeId:     topUp.UserId,
+			SourceType:    InviteRebateSourceTopUp,
+			SourceId:      topUp.TradeNo,
+			PaymentMethod: topUp.PaymentMethod,
+			BaseQuota:     quotaToAdd,
+			BaseAmount:    topUp.Money,
+			Currency:      "USD",
+		}); err != nil {
+			return err
+		}
+
 		userId = topUp.UserId
 		payMoney = topUp.Money
 		paymentMethod = topUp.PaymentMethod
@@ -389,7 +417,7 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 		return errors.New("未提供支付单号")
 	}
 
-	var quota int64
+	var quotaToAdd int
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
@@ -419,11 +447,14 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 		}
 
 		// Creem 直接使用 Amount 作为充值额度（整数）
-		quota = topUp.Amount
+		quotaToAdd = int(topUp.Amount)
+		if quotaToAdd <= 0 {
+			return errors.New("无效的充值额度")
+		}
 
 		// 构建更新字段，优先使用邮箱，如果邮箱为空则使用用户名
 		updateFields := map[string]interface{}{
-			"quota": gorm.Expr("quota + ?", quota),
+			"quota": gorm.Expr("quota + ?", quotaToAdd),
 		}
 
 		// 如果有客户邮箱，尝试更新用户邮箱（仅当用户邮箱为空时）
@@ -446,6 +477,18 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			return err
 		}
 
+		if _, err = GrantInviteRebateTx(tx, InviteRebateGrantParams{
+			InviteeId:     topUp.UserId,
+			SourceType:    InviteRebateSourceTopUp,
+			SourceId:      topUp.TradeNo,
+			PaymentMethod: topUp.PaymentMethod,
+			BaseQuota:     quotaToAdd,
+			BaseAmount:    topUp.Money,
+			Currency:      "USD",
+		}); err != nil {
+			return err
+		}
+
 		return nil
 	})
 
@@ -454,7 +497,7 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 		return errors.New("充值失败，请稍后重试")
 	}
 
-	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用Creem充值成功，充值额度: %v，支付金额：%.2f", quota, topUp.Money), callerIp, topUp.PaymentMethod, PaymentMethodCreem)
+	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用Creem充值成功，充值额度: %v，支付金额：%.2f", quotaToAdd, topUp.Money), callerIp, topUp.PaymentMethod, PaymentMethodCreem)
 
 	return nil
 }
@@ -504,6 +547,18 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 		}
 
 		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
+			return err
+		}
+
+		if _, err := GrantInviteRebateTx(tx, InviteRebateGrantParams{
+			InviteeId:     topUp.UserId,
+			SourceType:    InviteRebateSourceTopUp,
+			SourceId:      topUp.TradeNo,
+			PaymentMethod: topUp.PaymentMethod,
+			BaseQuota:     quotaToAdd,
+			BaseAmount:    topUp.Money,
+			Currency:      setting.WaffoCurrency,
+		}); err != nil {
 			return err
 		}
 
@@ -565,6 +620,18 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 		}
 
 		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
+			return err
+		}
+
+		if _, err := GrantInviteRebateTx(tx, InviteRebateGrantParams{
+			InviteeId:     topUp.UserId,
+			SourceType:    InviteRebateSourceTopUp,
+			SourceId:      topUp.TradeNo,
+			PaymentMethod: topUp.PaymentMethod,
+			BaseQuota:     quotaToAdd,
+			BaseAmount:    topUp.Money,
+			Currency:      setting.WaffoPancakeCurrency,
+		}); err != nil {
 			return err
 		}
 

@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -135,6 +137,8 @@ func InitOptionMap() {
 	common.OptionMap["QuotaForNewUser"] = strconv.Itoa(common.QuotaForNewUser)
 	common.OptionMap["QuotaForInviter"] = strconv.Itoa(common.QuotaForInviter)
 	common.OptionMap["QuotaForInvitee"] = strconv.Itoa(common.QuotaForInvitee)
+	common.OptionMap["InviteRebateEnabled"] = strconv.FormatBool(common.InviteRebateEnabled)
+	common.OptionMap["InviteRebateRatio"] = strconv.FormatFloat(common.InviteRebateRatio, 'f', -1, 64)
 	common.OptionMap["QuotaRemindThreshold"] = strconv.Itoa(common.QuotaRemindThreshold)
 	common.OptionMap["PreConsumedQuota"] = strconv.Itoa(common.PreConsumedQuota)
 	common.OptionMap["ModelRequestRateLimitCount"] = strconv.Itoa(setting.ModelRequestRateLimitCount)
@@ -207,6 +211,9 @@ func SyncOptions(frequency int) {
 }
 
 func UpdateOption(key string, value string) error {
+	if err := validateOptionValue(key, value); err != nil {
+		return err
+	}
 	// Save to database first
 	option := Option{
 		Key: key,
@@ -222,7 +229,31 @@ func UpdateOption(key string, value string) error {
 	return updateOptionMap(key, value)
 }
 
+func validateOptionValue(key string, value string) error {
+	switch key {
+	case "InviteRebateRatio":
+		_, err := parseInviteRebateRatioOption(value)
+		return err
+	default:
+		return nil
+	}
+}
+
+func parseInviteRebateRatioOption(value string) (float64, error) {
+	ratio, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil || math.IsNaN(ratio) || math.IsInf(ratio, 0) {
+		return 0, fmt.Errorf("邀请返利比例必须是 0 到 1 之间的数字")
+	}
+	if ratio < 0 || ratio > 1 {
+		return 0, fmt.Errorf("邀请返利比例必须在 0 到 1 之间")
+	}
+	return ratio, nil
+}
+
 func updateOptionMap(key string, value string) (err error) {
+	if err = validateOptionValue(key, value); err != nil {
+		return err
+	}
 	common.OptionMapRWMutex.Lock()
 	defer common.OptionMapRWMutex.Unlock()
 	common.OptionMap[key] = value
@@ -277,6 +308,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.AutomaticEnableChannelEnabled = boolValue
 		case "LogConsumeEnabled":
 			common.LogConsumeEnabled = boolValue
+		case "InviteRebateEnabled":
+			common.InviteRebateEnabled = boolValue
 		case "DisplayInCurrencyEnabled":
 			// 兼容旧字段：同步到新配置 general_setting.quota_display_type（运行时生效）
 			// true -> USD, false -> TOKENS
@@ -481,6 +514,8 @@ func updateOptionMap(key string, value string) (err error) {
 		common.QuotaForInviter, _ = strconv.Atoi(value)
 	case "QuotaForInvitee":
 		common.QuotaForInvitee, _ = strconv.Atoi(value)
+	case "InviteRebateRatio":
+		common.InviteRebateRatio, _ = parseInviteRebateRatioOption(value)
 	case "QuotaRemindThreshold":
 		common.QuotaRemindThreshold, _ = strconv.Atoi(value)
 	case "PreConsumedQuota":

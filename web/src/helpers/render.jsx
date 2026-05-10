@@ -139,7 +139,10 @@ export function getLucideIcon(key, selected = false) {
     case 'drawingTool':
       return <Palette {...commonProps} color={iconColor} />;
     case 'topup':
+    case 'wallet':
       return <CreditCard {...commonProps} color={iconColor} />;
+    case 'aff':
+      return <Gift {...commonProps} color={iconColor} />;
     case 'channel':
       return <Layers {...commonProps} color={iconColor} />;
     case 'redemption':

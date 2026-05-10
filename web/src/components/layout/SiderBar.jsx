@@ -36,6 +36,7 @@ const routerMap = {
   token: '/console/token',
   redemption: '/console/redemption',
   topup: '/console/topup',
+  aff: '/console/aff',
   user: '/console/user',
   subscription: '/console/subscription',
   log: '/console/log',
@@ -132,11 +133,24 @@ const SiderBar = ({ onNavigate = () => {} }) => {
   ]);
 
   const financeItems = useMemo(() => {
+    const walletItems = [
+      {
+        text: t('充值中心'),
+        itemKey: 'topup',
+        to: '/topup',
+      },
+      {
+        text: t('邀请返利'),
+        itemKey: 'aff',
+        to: '/aff',
+      },
+    ].filter((item) => isModuleVisible('personal', item.itemKey));
+
     const items = [
       {
         text: t('钱包管理'),
-        itemKey: 'topup',
-        to: '/topup',
+        itemKey: 'wallet',
+        items: walletItems,
       },
       {
         text: t('个人设置'),
@@ -147,6 +161,9 @@ const SiderBar = ({ onNavigate = () => {} }) => {
 
     // 根据配置过滤项目
     const filteredItems = items.filter((item) => {
+      if (item.itemKey === 'wallet') {
+        return item.items.length > 0;
+      }
       const configVisible = isModuleVisible('personal', item.itemKey);
       return configVisible;
     });
@@ -300,6 +317,11 @@ const SiderBar = ({ onNavigate = () => {} }) => {
     // 如果找到匹配的键，更新选中的键
     if (matchingKey) {
       setSelectedKeys([matchingKey]);
+      if (matchingKey === 'topup' || matchingKey === 'aff') {
+        setOpenedKeys((keys) =>
+          keys.includes('wallet') ? keys : [...keys, 'wallet'],
+        );
+      }
     }
   }, [location.pathname, routerMapState]);
 
@@ -494,7 +516,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
                 {!collapsed && (
                   <div className='sidebar-group-label'>{t('个人中心')}</div>
                 )}
-                {financeItems.map((item) => renderNavItem(item))}
+                {financeItems.map((item) => renderSubItem(item))}
               </div>
             </>
           )}

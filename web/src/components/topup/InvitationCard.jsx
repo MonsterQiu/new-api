@@ -26,8 +26,10 @@ import {
   Input,
   Badge,
   Space,
+  Tag,
 } from '@douyinfe/semi-ui';
 import { Copy, Users, BarChart2, TrendingUp, Gift, Zap } from 'lucide-react';
+import { StatusContext } from '../../context/Status';
 
 const { Text } = Typography;
 
@@ -38,19 +40,50 @@ const InvitationCard = ({
   setOpenTransfer,
   affLink,
   handleAffLinkClick,
+  inviteRebateEnabled,
+  inviteRebatePercent,
 }) => {
+  const [statusState] = React.useContext(StatusContext);
+  const statusInviteRebateRatio = Number(
+    statusState?.status?.invite_rebate_ratio,
+  );
+  const hasStatusInviteRebateRatio =
+    Number.isFinite(statusInviteRebateRatio) && statusInviteRebateRatio > 0;
+  const resolvedInviteRebatePercent =
+    inviteRebatePercent ||
+    (hasStatusInviteRebateRatio
+      ? `${(statusInviteRebateRatio * 100).toFixed(2).replace(/\.?0+$/, '')}%`
+      : '0%');
+  const resolvedInviteRebateEnabled =
+    typeof inviteRebateEnabled === 'boolean'
+      ? inviteRebateEnabled
+      : !!statusState?.status?.invite_rebate_enabled &&
+        hasStatusInviteRebateRatio;
+
   return (
     <Card className='!rounded-2xl shadow-sm border-0'>
       {/* 卡片头部 */}
-      <div className='flex items-center mb-4'>
-        <Avatar size='small' color='green' className='mr-3 shadow-md'>
-          <Gift size={16} />
-        </Avatar>
+      <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4'>
+        <div className='flex items-center'>
+          <Avatar size='small' color='green' className='mr-3 shadow-md'>
+            <Gift size={16} />
+          </Avatar>
+          <div>
+            <Typography.Text className='text-lg font-medium'>
+              {t('邀请奖励')}
+            </Typography.Text>
+            <div className='text-xs'>{t('邀请好友获得额外奖励')}</div>
+          </div>
+        </div>
         <div>
-          <Typography.Text className='text-lg font-medium'>
-            {t('邀请奖励')}
-          </Typography.Text>
-          <div className='text-xs'>{t('邀请好友获得额外奖励')}</div>
+          <Tag
+            color={resolvedInviteRebateEnabled ? 'green' : 'grey'}
+            shape='circle'
+          >
+            {resolvedInviteRebateEnabled
+              ? `${t('当前返利比例')} ${resolvedInviteRebatePercent}`
+              : `${t('返利未开启')} · ${t('当前返利比例')} ${resolvedInviteRebatePercent}`}
+          </Tag>
         </div>
       </div>
 
@@ -202,9 +235,23 @@ const InvitationCard = ({
             <div className='flex items-start gap-2'>
               <Badge dot type='success' />
               <Text type='tertiary' className='text-sm'>
-                {t('邀请好友注册，好友充值后您可获得相应奖励')}
+                {resolvedInviteRebateEnabled
+                  ? t(
+                      '被邀请用户充值或购买订阅后，按实际入账或等价充值额度的 {{percent}} 返利到邀请余额',
+                      { percent: resolvedInviteRebatePercent },
+                    )
+                  : t('邀请好友注册，好友充值后您可获得相应奖励')}
               </Text>
             </div>
+
+            {resolvedInviteRebateEnabled && (
+              <div className='flex items-start gap-2'>
+                <Badge dot type='success' />
+                <Text type='tertiary' className='text-sm'>
+                  {t('订阅订单按支付金额换算为等价充值额度后计算返利')}
+                </Text>
+              </div>
+            )}
 
             <div className='flex items-start gap-2'>
               <Badge dot type='success' />

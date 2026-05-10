@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,6 +17,21 @@ func insertUserForPaymentGuardTest(t *testing.T, id int, quota int) {
 		Username: "payment_guard_user",
 		Status:   common.UserStatusEnabled,
 		Quota:    quota,
+	}
+	require.NoError(t, DB.Create(user).Error)
+}
+
+func insertPaymentGuardUserWithName(t *testing.T, id int, username string, inviterID int) {
+	t.Helper()
+	user := &User{
+		Id:        id,
+		Username:  username,
+		Password:  "pass12345",
+		Status:    common.UserStatusEnabled,
+		Role:      common.RoleCommonUser,
+		Group:     "default",
+		AffCode:   username + "_aff",
+		InviterId: inviterID,
 	}
 	require.NoError(t, DB.Create(user).Error)
 }
@@ -169,4 +185,66 @@ func TestExpireSubscriptionOrder_RejectsMismatchedPaymentMethod(t *testing.T) {
 	order := GetSubscriptionOrderByTradeNo("sub-expire-guard")
 	require.NotNil(t, order)
 	assert.Equal(t, common.TopUpStatusPending, order.Status)
+}
+
+func TestCompleteSubscriptionOrder_GrantsInviteRebateFromPaidAmount(t *testing.T) {
+	truncateTables(t)
+
+	originalEnabled := common.InviteRebateEnabled
+	originalRatio := common.InviteRebateRatio
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalPrice := operation_setting.Price
+	common.InviteRebateEnabled = true
+	common.InviteRebateRatio = 0.2
+	common.QuotaPerUnit = 500000
+	operation_setting.Price = 0.5
+	t.Cleanup(func() {
+		common.InviteRebateEnabled = originalEnabled
+		common.InviteRebateRatio = originalRatio
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.Price = originalPrice
+	})
+
+	insertPaymentGuardUserWithName(t, 501, "rebate_inviter", 0)
+	insertPaymentGuardUserWithName(t, 502, "rebate_invitee", 501)
+
+	plan := &SubscriptionPlan{
+		Id:            601,
+		Title:         "Rebate Plan",
+		PriceAmount:   10,
+		Currency:      "CNY",
+		DurationUnit:  SubscriptionDurationMonth,
+		DurationValue: 1,
+		Enabled:       true,
+		TotalAmount:   0,
+	}
+	require.NoError(t, DB.Create(plan).Error)
+
+	order := &SubscriptionOrder{
+		UserId:        502,
+		PlanId:        plan.Id,
+		Money:         plan.PriceAmount,
+		TradeNo:       "sub-rebate-order",
+		PaymentMethod: "alipay",
+		Status:        common.TopUpStatusPending,
+		CreateTime:    time.Now().Unix(),
+	}
+	require.NoError(t, order.Insert())
+
+	require.NoError(t, CompleteSubscriptionOrder(order.TradeNo, `{"provider":"epay"}`, "alipay"))
+
+	expectedBaseQuota := int((10 / operation_setting.Price) * common.QuotaPerUnit)
+	expectedRebateQuota := int(float64(expectedBaseQuota) * common.InviteRebateRatio)
+
+	var inviter User
+	require.NoError(t, DB.First(&inviter, 501).Error)
+	assert.Equal(t, expectedRebateQuota, inviter.AffQuota)
+	assert.Equal(t, expectedRebateQuota, inviter.AffHistoryQuota)
+
+	var rebate InviteRebate
+	require.NoError(t, DB.Where("source_type = ? AND source_id = ?", InviteRebateSourceSubscription, order.TradeNo).First(&rebate).Error)
+	assert.Equal(t, 501, rebate.InviterId)
+	assert.Equal(t, 502, rebate.InviteeId)
+	assert.Equal(t, expectedBaseQuota, rebate.BaseQuota)
+	assert.Equal(t, expectedRebateQuota, rebate.RebateQuota)
 }

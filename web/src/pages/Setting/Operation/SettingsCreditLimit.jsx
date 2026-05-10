@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useContext, useEffect, useState, useRef } from 'react';
 import { Button, Col, Form, Row, Spin } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import {
@@ -27,15 +27,19 @@ import {
   showSuccess,
   showWarning,
 } from '../../../helpers';
+import { StatusContext } from '../../../context/Status';
 
 export default function SettingsCreditLimit(props) {
   const { t } = useTranslation();
+  const [, statusDispatch] = useContext(StatusContext);
   const [loading, setLoading] = useState(false);
   const [inputs, setInputs] = useState({
     QuotaForNewUser: '',
     PreConsumedQuota: '',
     QuotaForInviter: '',
     QuotaForInvitee: '',
+    InviteRebateEnabled: false,
+    InviteRebateRatio: '',
     'quota_setting.enable_free_model_pre_consume': true,
   });
   const refForm = useRef();
@@ -67,6 +71,13 @@ export default function SettingsCreditLimit(props) {
         }
         showSuccess(t('保存成功'));
         props.refresh();
+        API.get('/api/status')
+          .then((statusRes) => {
+            if (statusRes.data.success) {
+              statusDispatch({ type: 'set', payload: statusRes.data.data });
+            }
+          })
+          .catch(() => {});
       })
       .catch(() => {
         showError(t('保存失败，请重试'));
@@ -179,6 +190,41 @@ export default function SettingsCreditLimit(props) {
                     setInputs({
                       ...inputs,
                       'quota_setting.enable_free_model_pre_consume': value,
+                    })
+                  }
+                />
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8} lg={8} xl={6}>
+                <Form.Switch
+                  label={t('启用邀请返利')}
+                  field={'InviteRebateEnabled'}
+                  extraText={t(
+                    '开启后，被邀请用户完成充值或订阅支付时，为邀请人增加返利额度',
+                  )}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      InviteRebateEnabled: value,
+                    })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={12} md={8} lg={8} xl={6}>
+                <Form.InputNumber
+                  label={t('邀请返利比例')}
+                  field={'InviteRebateRatio'}
+                  step={0.01}
+                  min={0}
+                  max={1}
+                  precision={4}
+                  extraText={t('0.2 表示返还 20% 对应额度，返利进入邀请余额')}
+                  placeholder={t('例如：0.2')}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      InviteRebateRatio: String(value),
                     })
                   }
                 />

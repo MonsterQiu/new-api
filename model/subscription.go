@@ -393,8 +393,9 @@ func getSubscriptionPlanByIdTx(tx *gorm.DB, id int) (*SubscriptionPlan, error) {
 	if id <= 0 {
 		return nil, errors.New("invalid plan id")
 	}
-	key := subscriptionPlanCacheKey(id)
-	if key != "" {
+	key := ""
+	if tx == nil {
+		key = subscriptionPlanCacheKey(id)
 		if cached, found, err := getSubscriptionPlanCache().Get(key); err == nil && found {
 			return &cached, nil
 		}
@@ -407,7 +408,9 @@ func getSubscriptionPlanByIdTx(tx *gorm.DB, id int) (*SubscriptionPlan, error) {
 	if err := query.Where("id = ?", id).First(&plan).Error; err != nil {
 		return nil, err
 	}
-	_ = getSubscriptionPlanCache().SetWithTTL(key, plan, subscriptionPlanCacheTTL())
+	if tx == nil && key != "" {
+		_ = getSubscriptionPlanCache().SetWithTTL(key, plan, subscriptionPlanCacheTTL())
+	}
 	return &plan, nil
 }
 
@@ -518,7 +521,7 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 			return nil, errors.New("该套餐已售罄")
 		}
 	}
-	nowUnix := GetDBTimestamp()
+	nowUnix := getDBTimestampTx(tx)
 	now := time.Unix(nowUnix, 0)
 	endUnix, err := calcPlanEndTime(now, plan)
 	if err != nil {
@@ -595,7 +598,7 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		if order.Status != common.TopUpStatusPending {
 			return ErrSubscriptionOrderStatusInvalid
 		}
-		plan, err := GetSubscriptionPlanById(order.PlanId)
+		plan, err := getSubscriptionPlanByIdTx(tx, order.PlanId)
 		if err != nil {
 			return err
 		}
@@ -608,6 +611,18 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 			return err
 		}
 		if err := upsertSubscriptionTopUpTx(tx, &order); err != nil {
+			return err
+		}
+		baseQuota := CalculateSubscriptionInviteRebateBaseQuotaTx(tx, &order, plan)
+		if _, err := GrantInviteRebateTx(tx, InviteRebateGrantParams{
+			InviteeId:     order.UserId,
+			SourceType:    InviteRebateSourceSubscription,
+			SourceId:      order.TradeNo,
+			PaymentMethod: order.PaymentMethod,
+			BaseQuota:     baseQuota,
+			BaseAmount:    order.Money,
+			Currency:      plan.Currency,
+		}); err != nil {
 			return err
 		}
 		order.Status = common.TopUpStatusSuccess
