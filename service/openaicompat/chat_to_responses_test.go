@@ -116,3 +116,35 @@ func TestChatCompletionsRequestToResponsesRequestKeepsTypedFallbackForToolOutput
 		t.Fatalf("content part text = %v, want fallback tool output text", got)
 	}
 }
+
+func TestChatCompletionsRequestToResponsesRequestPreservesPromptCacheFields(t *testing.T) {
+	req := &dto.GeneralOpenAIRequest{
+		Model:                "gpt-5.4",
+		PromptCacheKey:       "cline-session-123",
+		PromptCacheRetention: []byte(`"24h"`),
+		Messages: []dto.Message{
+			{Role: "user", Content: "hello"},
+		},
+	}
+
+	respReq, err := ChatCompletionsRequestToResponsesRequest(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var cacheKey string
+	if err := common.Unmarshal(respReq.PromptCacheKey, &cacheKey); err != nil {
+		t.Fatalf("failed to decode prompt_cache_key: %v", err)
+	}
+	if cacheKey != "cline-session-123" {
+		t.Fatalf("prompt_cache_key = %q, want %q", cacheKey, "cline-session-123")
+	}
+
+	var retention string
+	if err := common.Unmarshal(respReq.PromptCacheRetention, &retention); err != nil {
+		t.Fatalf("failed to decode prompt_cache_retention: %v", err)
+	}
+	if retention != "24h" {
+		t.Fatalf("prompt_cache_retention = %q, want %q", retention, "24h")
+	}
+}
