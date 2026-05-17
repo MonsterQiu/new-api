@@ -23,8 +23,10 @@ web/bun.lock
 plans
 .claude
 deploy/.env.prod
+deploy/.env.enterprise
 deploy/.env.preview
 deploy/.env.release
+deploy/*.bak.*
 
 electron/node_modules
 electron/dist

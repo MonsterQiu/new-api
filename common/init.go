@@ -109,6 +109,11 @@ func InitEnv() {
 	GeminiSafetySetting = GetEnvOrDefaultString("GEMINI_SAFETY_SETTING", "BLOCK_NONE")
 	CohereSafetySetting = GetEnvOrDefaultString("COHERE_SAFETY_SETTING", "NONE")
 
+	// Home page branding overrides. Empty means hide the corresponding section.
+	HeroAccentZH = GetEnvOrDefaultString("HERO_ACCENT_ZH", "")
+	ContactLabel = GetEnvOrDefaultString("CONTACT_LABEL", "")
+	ContactValue = GetEnvOrDefaultString("CONTACT_VALUE", "")
+
 	// Initialize rate limit variables
 	GlobalApiRateLimitEnable = GetEnvOrDefaultBool("GLOBAL_API_RATE_LIMIT_ENABLE", true)
 	GlobalApiRateLimitNum = GetEnvOrDefault("GLOBAL_API_RATE_LIMIT", 180)

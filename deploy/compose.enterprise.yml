@@ -6,7 +6,7 @@ services:
       - --log-dir
       - /data/logs
     ports:
-      - "${APP_BIND_IP:-127.0.0.1}:${APP_PORT:-3000}:3000"
+      - "${APP_BIND_IP:-127.0.0.1}:${APP_PORT:-3001}:3000"
     environment:
       TZ: ${TZ:-Asia/Shanghai}
       SQL_DSN: ${SQL_DSN:?set SQL_DSN in the env file}
@@ -44,14 +44,14 @@ services:
       - --default-authentication-plugin=caching_sha2_password
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
-      - --innodb-buffer-pool-size=2G
-      - --innodb-log-file-size=256M
+      - --innodb-buffer-pool-size=512M
+      - --innodb-log-file-size=128M
       - --innodb-flush-method=O_DIRECT
-      - --max-connections=300
+      - --max-connections=200
     environment:
       TZ: ${TZ:-Asia/Shanghai}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in the env file}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-new-api}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-enterprise}
     volumes:
       - ${MYSQL_DATA_DIR:?set MYSQL_DATA_DIR in the env file}:/var/lib/mysql
     expose:
@@ -75,7 +75,7 @@ services:
       - --requirepass
       - ${REDIS_PASSWORD:?set REDIS_PASSWORD in the env file}
       - --maxmemory
-      - 512mb
+      - 256mb
       - --maxmemory-policy
       - allkeys-lru
       - --appendonly

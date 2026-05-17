@@ -17,6 +17,13 @@ var Footer = ""
 var Logo = ""
 var TopUpLink = ""
 
+// Home page hero accent text shown under the main title. Empty hides it.
+var HeroAccentZH = ""
+
+// Optional contact card on the Home page. Both must be set to render.
+var ContactLabel = ""
+var ContactValue = ""
+
 // var ChatLink = ""
 // var ChatLink2 = ""
 var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens

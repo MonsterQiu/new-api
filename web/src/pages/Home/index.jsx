@@ -50,8 +50,11 @@ const Home = () => {
       : 'Sisyphus gateway is now ready';
   const heroTitle = isChinese ? 'Sisyphus API' : 'Sisyphus API';
   const heroAccent = isChinese
-    ? '领体验额度QQ群：157708448'
-    : 'Domestic Direct Access';
+    ? (statusState?.status?.hero_accent_zh ?? '').trim()
+    : '';
+  const contactLabel = (statusState?.status?.contact_label ?? '').trim();
+  const contactValue = (statusState?.status?.contact_value ?? '').trim();
+  const contactVisible = Boolean(contactLabel && contactValue);
   const heroMetrics = isChinese
     ? [
         { value: '99.9%', label: '可用性' },
@@ -187,10 +190,14 @@ const Home = () => {
                     className={`font-headline text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-semi-color-text-0 leading-[1.02] ${isChinese ? 'tracking-normal' : 'tracking-tight'}`}
                   >
                     {heroTitle}
-                    <br />
-                    <span className='text-brand-primary italic font-normal'>
-                      {heroAccent}
-                    </span>
+                    {heroAccent ? (
+                      <>
+                        <br />
+                        <span className='text-brand-primary italic font-normal'>
+                          {heroAccent}
+                        </span>
+                      </>
+                    ) : null}
                   </h1>
 
                   <div className='flex flex-wrap items-stretch justify-center gap-4 md:gap-6 w-full'>
@@ -243,17 +250,16 @@ const Home = () => {
                     </Link>
                   </div>
                 </div>
-                <div
-                  className='w-full max-w-[860px] rounded-2xl border border-[#c2652a]/70 bg-[#171311]/70 px-6 py-5 text-center
-  shadow-[0_12px_36px_rgba(194,101,42,0.12)]'
-                >
-                  <div className='font-body text-sm font-semibold tracking-[0.08em] text-[#8f7f74]'>
-                    联系方式
+                {contactVisible ? (
+                  <div className='w-full max-w-[860px] rounded-2xl border border-[#c2652a]/70 bg-[#171311]/70 px-6 py-5 text-center shadow-[0_12px_36px_rgba(194,101,42,0.12)]'>
+                    <div className='font-body text-sm font-semibold tracking-[0.08em] text-[#8f7f74]'>
+                      {contactLabel}
+                    </div>
+                    <div className='mt-2 font-headline text-2xl text-[#c2652a] md:text-3xl'>
+                      {contactValue}
+                    </div>
                   </div>
-                  <div className='mt-2 font-headline text-2xl  text-[#c2652a] md:text-3xl'>
-                    VX联系方式：sisyphusx_api
-                  </div>
-                </div>
+                ) : null}
 
                 <section className='mt-8 w-full rounded-[32px] border border-[#241d19] bg-[#0b0908] px-4 py-6 text-left shadow-[0_30px_80px_rgba(18,12,9,0.32)] md:mt-12 md:px-6 md:py-8 lg:px-8 lg:py-10'>
                   <div className='relative overflow-hidden py-3'>
