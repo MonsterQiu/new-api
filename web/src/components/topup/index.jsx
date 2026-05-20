@@ -955,7 +955,6 @@ const TopUp = () => {
           selectedPreset={selectedPreset}
           selectPresetAmount={selectPresetAmount}
           formatLargeNumber={formatLargeNumber}
-          priceRatio={priceRatio}
           topUpCount={topUpCount}
           minTopUp={minTopUp}
           renderQuotaWithAmount={renderQuotaWithAmount}
