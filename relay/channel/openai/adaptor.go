@@ -598,6 +598,13 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 		}
 		request.Model = originModel
 	}
+	if strings.HasPrefix(request.Model, "o") {
+		request.Temperature = nil
+	}
+	if strings.HasPrefix(request.Model, "gpt-5") {
+		request.Temperature = nil
+		request.TopP = nil
+	}
 	if info != nil && request.Reasoning != nil && request.Reasoning.Effort != "" {
 		info.ReasoningEffort = request.Reasoning.Effort
 	}
