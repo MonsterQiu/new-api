@@ -29,9 +29,13 @@
 
 - `compose.prod.yml`: 生产环境 compose
 - `compose.preview.yml`: 预发环境 compose
+- `compose.enterprise.yml`: 企业中转站 compose
 - `.env.prod.example`: 生产环境变量模板
 - `.env.preview.example`: 预发环境变量模板
+- `.env.enterprise.example`: 企业中转站变量模板
 - `build-and-push.ps1`: 本地构建并推送你自己的镜像
+- `remote-deploy-prod.sh`: 生产环境远程更新脚本
+- `remote-deploy-enterprise.sh`: 企业中转站远程更新脚本
 - `Caddyfile.origin.example`: 适合当前 origin 架构的 Caddy 示例
 
 ## 本地开发
@@ -216,7 +220,16 @@ chmod +x deploy/remote-deploy-prod.sh
 
 如果镜像已经推送完成，服务器上实际只需要：
 
+生产环境：
+
 ```bash
 docker-compose --env-file deploy/.env.prod -f deploy/compose.prod.yml pull new-api
 docker-compose --env-file deploy/.env.prod -f deploy/compose.prod.yml up -d new-api
+```
+
+企业中转站：
+
+```bash
+docker-compose --env-file deploy/.env.enterprise -f deploy/compose.enterprise.yml pull new-api
+docker-compose --env-file deploy/.env.enterprise -f deploy/compose.enterprise.yml up -d new-api
 ```
