@@ -91,6 +91,8 @@ const SubscriptionPurchaseModal = ({
   const perUserCount = Number(purchaseLimitInfo?.perUserCount || 0);
   const totalLimit = Number(purchaseLimitInfo?.totalLimit || 0);
   const totalCount = Number(purchaseLimitInfo?.totalCount || 0);
+  const totalRemaining =
+    totalLimit > 0 ? Math.max(totalLimit - totalCount, 0) : 0;
   const purchaseLimitReached = perUserLimit > 0 && perUserCount >= perUserLimit;
   const totalLimitReached = totalLimit > 0 && totalCount >= totalLimit;
 
@@ -191,7 +193,10 @@ const SubscriptionPurchaseModal = ({
                     {t('总量限购')}：
                   </Text>
                   <Text className='text-slate-900 dark:text-slate-100'>
-                    {totalCount}/{totalLimit}
+                    {t('剩余 {{count}} / {{limit}}', {
+                      count: totalRemaining,
+                      limit: totalLimit,
+                    })}
                   </Text>
                 </div>
               ) : null}
@@ -226,7 +231,13 @@ const SubscriptionPurchaseModal = ({
           {totalLimitReached ? (
             <Banner
               type='danger'
-              description={`${t('该套餐已售罄')} (${totalCount}/${totalLimit})`}
+              description={`${t('该套餐已售罄')} (${t(
+                '剩余 {{count}} / {{limit}}',
+                {
+                  count: totalRemaining,
+                  limit: totalLimit,
+                },
+              )})`}
               className='!rounded-xl'
               closeIcon={null}
             />

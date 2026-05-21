@@ -489,7 +489,6 @@ const SubscriptionPlansCard = ({
             <div className='grid grid-cols-1 gap-3 w-full px-1 md:grid-cols-2 2xl:grid-cols-3'>
               {plans.map((p, index) => {
                 const plan = p?.plan;
-                const purchaseUserCount = Number(p?.purchase_user_count || 0);
                 const totalPurchaseCount = Number(p?.total_purchase_count || 0);
                 const totalAmount = Number(plan?.total_amount || 0);
                 const paymentDisplays = getGroupedSubscriptionPaymentOptions({
@@ -517,7 +516,10 @@ const SubscriptionPlansCard = ({
                   limit > 0 ? `${t('每用户限购')}: ${limit}` : null;
                 const totalPurchaseLabel =
                   totalPurchaseLimit > 0
-                    ? `${t('总量限购')}: ${totalPurchaseCount}/${totalPurchaseLimit}`
+                    ? `${t('总量限购')}: ${t('剩余 {{count}} / {{limit}}', {
+                        count: remainingCount,
+                        limit: totalPurchaseLimit,
+                      })}`
                     : null;
                 const totalLabel =
                   totalAmount > 0
@@ -591,11 +593,6 @@ const SubscriptionPlansCard = ({
                           </Text>
                         )}
                         <div className='mt-2 flex flex-wrap items-center gap-1.5'>
-                          <Tag color='cyan' shape='circle' size='small'>
-                            {t('购买人数 {{count}}', {
-                              count: purchaseUserCount,
-                            })}
-                          </Tag>
                           {limit > 0 && (
                             <Tag color='orange' shape='circle' size='small'>
                               {`${t('每用户限购')} ${limit}`}
@@ -709,7 +706,13 @@ const SubscriptionPlansCard = ({
                           const reached = limit > 0 && count >= limit;
                           const disabled = soldOut || reached;
                           const tip = soldOut
-                            ? `${t('该套餐已售罄')} (${totalPurchaseCount}/${totalPurchaseLimit})`
+                            ? `${t('该套餐已售罄')} (${t(
+                                '剩余 {{count}} / {{limit}}',
+                                {
+                                  count: remainingCount,
+                                  limit: totalPurchaseLimit,
+                                },
+                              )})`
                             : reached
                               ? t('已达到购买上限') + ` (${count}/${limit})`
                               : '';
