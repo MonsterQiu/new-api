@@ -241,6 +241,18 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
         encodeToBase64(JSON.stringify(cherryConfig)),
       );
       url = url.replaceAll('{cherryConfig}', encodedConfig);
+    } else if (url.includes('{cherryResponsesConfig}') === true) {
+      let cherryResponsesConfig = {
+        id: 'new-api-responses',
+        name: 'New API Responses',
+        type: 'openai-response',
+        baseUrl: serverAddress,
+        apiKey: `sk-${fullKey}`,
+      };
+      let encodedConfig = encodeURIComponent(
+        encodeToBase64(JSON.stringify(cherryResponsesConfig)),
+      );
+      url = url.replaceAll('{cherryResponsesConfig}', encodedConfig);
     } else if (url.includes('{aionuiConfig}') === true) {
       let aionuiConfig = {
         platform: 'new-api',

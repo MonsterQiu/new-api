@@ -1,10 +1,6 @@
 package setting
 
-import (
-	"encoding/json"
-
-	"github.com/QuantumNous/new-api/common"
-)
+import "github.com/QuantumNous/new-api/common"
 
 var Chats = []map[string]string{
 	//{
@@ -12,6 +8,9 @@ var Chats = []map[string]string{
 	//},
 	{
 		"Cherry Studio": "cherrystudio://providers/api-keys?v=1&data={cherryConfig}",
+	},
+	{
+		"Cherry Studio (Responses)": "cherrystudio://providers/api-keys?v=1&data={cherryResponsesConfig}",
 	},
 	{
 		"AionUI": "aionui://provider/add?v=1&data={aionuiConfig}",
@@ -38,11 +37,11 @@ var Chats = []map[string]string{
 
 func UpdateChatsByJsonString(jsonString string) error {
 	Chats = make([]map[string]string, 0)
-	return json.Unmarshal([]byte(jsonString), &Chats)
+	return common.UnmarshalJsonStr(jsonString, &Chats)
 }
 
 func Chats2JsonString() string {
-	jsonBytes, err := json.Marshal(Chats)
+	jsonBytes, err := common.Marshal(Chats)
 	if err != nil {
 		common.SysLog("error marshalling chats: " + err.Error())
 		return "[]"
