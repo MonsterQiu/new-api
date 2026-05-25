@@ -102,7 +102,7 @@ func TestResponsesResponseToClaudeResponseConvertsFunctionCallAndCacheUsage(t *t
 				ID:        "fc_1",
 				CallId:    "call_1",
 				Name:      "edit_file",
-				Arguments: `{"path":"main.go"}`,
+				Arguments: common.StringToByteSlice(`{"path":"main.go"}`),
 			},
 		},
 		Usage: &dto.Usage{

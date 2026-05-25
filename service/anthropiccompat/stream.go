@@ -187,13 +187,13 @@ func (s *ResponsesToClaudeStreamState) toolItemEvents(item *dto.ResponsesOutput)
 		s.toolNameByID[callID] = name
 	}
 	events := s.ensureToolBlock(callID)
-	if item.Arguments != "" {
+	if args := item.ArgumentsString(); args != "" {
 		prev := s.toolArgsByID[callID]
-		delta := item.Arguments
-		if prev != "" && strings.HasPrefix(item.Arguments, prev) {
-			delta = item.Arguments[len(prev):]
+		delta := args
+		if prev != "" && strings.HasPrefix(args, prev) {
+			delta = args[len(prev):]
 		}
-		s.toolArgsByID[callID] = item.Arguments
+		s.toolArgsByID[callID] = args
 		events = append(events, s.toolArgsDeltaForCall(callID, delta)...)
 	}
 	return events
@@ -342,7 +342,7 @@ func (s *ResponsesToClaudeStreamState) outputEventsFromCompletedResponse(resp *d
 				s.toolNameByID[callID] = output.Name
 			}
 			events = append(events, s.ensureToolBlock(callID)...)
-			events = append(events, s.toolArgsDeltaForCall(callID, output.Arguments)...)
+			events = append(events, s.toolArgsDeltaForCall(callID, output.ArgumentsString())...)
 		}
 	}
 	return events

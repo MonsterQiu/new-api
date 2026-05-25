@@ -393,7 +393,7 @@ func responsesOutputsToClaudeContent(outputs []dto.ResponsesOutput) []dto.Claude
 				Type:  "tool_use",
 				Id:    callID,
 				Name:  output.Name,
-				Input: parseToolArguments(output.Arguments),
+				Input: parseToolArguments(output.ArgumentsString()),
 			})
 		}
 	}
@@ -597,8 +597,8 @@ func CollectResponsesStreamResponse(body io.Reader, fallbackModel string) (*dto.
 			if name := strings.TrimSpace(streamResp.Item.Name); name != "" {
 				nameByCallID[callID] = name
 			}
-			if streamResp.Item.Arguments != "" {
-				argsByCallID[callID] = streamResp.Item.Arguments
+			if args := streamResp.Item.ArgumentsString(); args != "" {
+				argsByCallID[callID] = args
 			}
 		case "response.function_call_arguments.delta":
 			callID := callIDByItemID[strings.TrimSpace(streamResp.ItemID)]
@@ -676,7 +676,7 @@ func synthesizeResponsesOutput(text string, callOrder []string, nameByCallID map
 			ID:        callID,
 			CallId:    callID,
 			Name:      nameByCallID[callID],
-			Arguments: argsByCallID[callID],
+			Arguments: common.StringToByteSlice(argsByCallID[callID]),
 			Status:    "completed",
 		})
 	}

@@ -158,8 +158,8 @@ func collectResponsesStreamResponse(body io.Reader, fallbackModel string) (*dto.
 			if name := strings.TrimSpace(streamResp.Item.Name); name != "" {
 				toolCallNameByID[callID] = name
 			}
-			if streamResp.Item.Arguments != "" {
-				toolCallArgsByID[callID] = streamResp.Item.Arguments
+			if args := streamResp.Item.ArgumentsString(); args != "" {
+				toolCallArgsByID[callID] = args
 			}
 
 		case "response.function_call_arguments.delta":
@@ -228,7 +228,7 @@ func collectResponsesStreamResponse(body io.Reader, fallbackModel string) (*dto.
 					ID:        callID,
 					CallId:    callID,
 					Name:      toolCallNameByID[callID],
-					Arguments: toolCallArgsByID[callID],
+					Arguments: common.StringToByteSlice(toolCallArgsByID[callID]),
 					Status:    "completed",
 				})
 			}

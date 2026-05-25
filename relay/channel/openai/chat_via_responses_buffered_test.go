@@ -112,7 +112,32 @@ func TestCollectResponsesStreamResponseSynthesizesToolCallsWhenCompletedPayloadI
 	if resp.Output[0].Type != "function_call" || resp.Output[0].Name != "search" {
 		t.Fatalf("unexpected synthesized tool call: %#v", resp.Output[0])
 	}
-	if resp.Output[0].Arguments != "{\"q\":\"hello\"}" {
-		t.Fatalf("unexpected synthesized arguments: %q", resp.Output[0].Arguments)
+	if resp.Output[0].ArgumentsString() != "{\"q\":\"hello\"}" {
+		t.Fatalf("unexpected synthesized arguments: %q", resp.Output[0].ArgumentsString())
+	}
+}
+
+func TestCollectResponsesStreamResponseAcceptsObjectToolArguments(t *testing.T) {
+	body := strings.NewReader(strings.Join([]string{
+		`data: {"type":"response.created","response":{"id":"resp_3","model":"gpt-5.4","created_at":321}}`,
+		`data: {"type":"response.output_item.added","item":{"type":"function_call","id":"item_1","call_id":"call_1","name":"search","arguments":{"q":"hello"}}}`,
+		`data: [DONE]`,
+	}, "\n"))
+
+	resp, fallbackText, err := collectResponsesStreamResponse(body, "fallback-model")
+	if err != nil {
+		t.Fatalf("collectResponsesStreamResponse returned error: %v", err)
+	}
+	if resp == nil {
+		t.Fatalf("expected synthesized response payload")
+	}
+	if fallbackText != "" {
+		t.Fatalf("expected empty fallback text, got %q", fallbackText)
+	}
+	if len(resp.Output) != 1 {
+		t.Fatalf("expected one synthesized tool call, got %#v", resp.Output)
+	}
+	if resp.Output[0].ArgumentsString() != `{"q":"hello"}` {
+		t.Fatalf("unexpected synthesized arguments: %q", resp.Output[0].ArgumentsString())
 	}
 }
