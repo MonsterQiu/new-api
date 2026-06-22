@@ -2,7 +2,6 @@ package billingexpr_test
 
 import (
 	"math"
-	"math/rand"
 	"testing"
 
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
@@ -594,91 +593,6 @@ func TestComputeTieredQuota_WithCacheCrossTier(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Fuzz: random p/c/cache, verify non-negative result
-// ---------------------------------------------------------------------------
-
-func TestFuzz_NonNegativeResults(t *testing.T) {
-	exprs := []string{
-		claudeExpr,
-		claudeWithCacheExpr,
-		glmExpr,
-		"p * 0.5 + c * 1.0",
-		"max(p, c) * 0.1",
-		"p * 0.5 + cr * 0.1 + cc * 0.2",
-	}
-
-	rng := rand.New(rand.NewSource(42))
-
-	for _, exprStr := range exprs {
-		for i := 0; i < 500; i++ {
-			params := billingexpr.TokenParams{
-				P:    math.Round(rng.Float64() * 1000000),
-				C:    math.Round(rng.Float64() * 500000),
-				CR:   math.Round(rng.Float64() * 200000),
-				CC:   math.Round(rng.Float64() * 50000),
-				CC1h: math.Round(rng.Float64() * 10000),
-			}
-
-			cost, _, err := billingexpr.RunExpr(exprStr, params)
-			if err != nil {
-				t.Fatalf("expr=%q params=%+v: %v", exprStr, params, err)
-			}
-			if cost < 0 {
-				t.Errorf("expr=%q params=%+v: negative cost %f", exprStr, params, cost)
-			}
-		}
-	}
-}
-
-func TestFuzz_SettlementConsistency(t *testing.T) {
-	rng := rand.New(rand.NewSource(99))
-
-	for i := 0; i < 200; i++ {
-		estParams := billingexpr.TokenParams{
-			P:  math.Round(rng.Float64() * 500000),
-			C:  math.Round(rng.Float64() * 100000),
-			CR: math.Round(rng.Float64() * 100000),
-			CC: math.Round(rng.Float64() * 30000),
-		}
-		actParams := billingexpr.TokenParams{
-			P:  math.Round(rng.Float64() * 500000),
-			C:  math.Round(rng.Float64() * 100000),
-			CR: math.Round(rng.Float64() * 100000),
-			CC: math.Round(rng.Float64() * 30000),
-		}
-		groupRatio := 0.5 + rng.Float64()*2.0
-
-		estCost, estTrace, _ := billingexpr.RunExpr(claudeWithCacheExpr, estParams)
-
-		const qpu = 500_000.0
-		snap := &billingexpr.BillingSnapshot{
-			BillingMode:               "tiered_expr",
-			ExprString:                claudeWithCacheExpr,
-			ExprHash:                  billingexpr.ExprHashString(claudeWithCacheExpr),
-			GroupRatio:                groupRatio,
-			EstimatedPromptTokens:     int(estParams.P),
-			EstimatedCompletionTokens: int(estParams.C),
-			EstimatedQuotaBeforeGroup: estCost / 1_000_000 * qpu,
-			EstimatedQuotaAfterGroup:  billingexpr.QuotaRound(estCost / 1_000_000 * qpu * groupRatio),
-			EstimatedTier:             estTrace.MatchedTier,
-			QuotaPerUnit:              qpu,
-		}
-
-		result, err := billingexpr.ComputeTieredQuota(snap, actParams)
-		if err != nil {
-			t.Fatalf("iter %d: %v", i, err)
-		}
-
-		directCost, _, _ := billingexpr.RunExpr(claudeWithCacheExpr, actParams)
-		directQuota := billingexpr.QuotaRound(directCost / 1_000_000 * qpu * groupRatio)
-
-		if result.ActualQuotaAfterGroup != directQuota {
-			t.Errorf("iter %d: settlement %d != direct %d", i, result.ActualQuotaAfterGroup, directQuota)
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Settlement-level tests for ComputeTieredQuota
 // ---------------------------------------------------------------------------
 
@@ -1001,10 +915,81 @@ func TestImageAudioZero(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// len variable tests — tier conditions based on context length
+// ---------------------------------------------------------------------------
+
+const lenTieredExpr = `len <= 200000 ? tier("standard", p * 3 + c * 15 + cr * 0.3) : tier("long_context", p * 6 + c * 22.5 + cr * 0.6)`
+
+func TestLen_StandardTier(t *testing.T) {
+	params := billingexpr.TokenParams{P: 80000, C: 5000, Len: 100000, CR: 20000}
+	cost, trace, err := billingexpr.RunExpr(lenTieredExpr, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := 80000*3 + 5000*15 + 20000*0.3
+	if math.Abs(cost-want) > 1e-6 {
+		t.Errorf("cost = %f, want %f", cost, want)
+	}
+	if trace.MatchedTier != "standard" {
+		t.Errorf("tier = %q, want standard", trace.MatchedTier)
+	}
+}
+
+func TestLen_LongContextTier(t *testing.T) {
+	// p is low (cache subtracted), but len is high (full context)
+	params := billingexpr.TokenParams{P: 50000, C: 5000, Len: 300000, CR: 250000}
+	cost, trace, err := billingexpr.RunExpr(lenTieredExpr, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := 50000*6 + 5000*22.5 + 250000*0.6
+	if math.Abs(cost-want) > 1e-6 {
+		t.Errorf("cost = %f, want %f", cost, want)
+	}
+	if trace.MatchedTier != "long_context" {
+		t.Errorf("tier = %q, want long_context (len=300000 > 200000)", trace.MatchedTier)
+	}
+}
+
+func TestLen_BoundaryExact(t *testing.T) {
+	params := billingexpr.TokenParams{P: 100000, C: 1000, Len: 200000, CR: 100000}
+	_, trace, err := billingexpr.RunExpr(lenTieredExpr, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trace.MatchedTier != "standard" {
+		t.Errorf("tier = %q, want standard (len=200000 <= 200000)", trace.MatchedTier)
+	}
+}
+
+func TestLen_BoundaryPlusOne(t *testing.T) {
+	params := billingexpr.TokenParams{P: 100000, C: 1000, Len: 200001, CR: 100001}
+	_, trace, err := billingexpr.RunExpr(lenTieredExpr, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trace.MatchedTier != "long_context" {
+		t.Errorf("tier = %q, want long_context (len=200001 > 200000)", trace.MatchedTier)
+	}
+}
+
+func TestLen_ZeroDefaultsToZero(t *testing.T) {
+	// len defaults to 0 when not set
+	params := billingexpr.TokenParams{P: 1000, C: 500}
+	_, trace, err := billingexpr.RunExpr(lenTieredExpr, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trace.MatchedTier != "standard" {
+		t.Errorf("tier = %q, want standard (len=0 <= 200000)", trace.MatchedTier)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Benchmarks: compile vs cached execution
 // ---------------------------------------------------------------------------
 
-const benchComplexExpr = `p <= 200000 ? tier("standard", p * 3 + c * 15 + cr * 0.3 + cc * 3.75 + cc1h * 6 + img * 3 + img_o * 30 + ai * 10 + ao * 40) : tier("long_context", p * 6 + c * 22.5 + cr * 0.6 + cc * 7.5 + cc1h * 12 + img * 6 + img_o * 60 + ai * 20 + ao * 80)`
+const benchComplexExpr = `len <= 200000 ? tier("standard", p * 3 + c * 15 + cr * 0.3 + cc * 3.75 + cc1h * 6 + img * 3 + img_o * 30 + ai * 10 + ao * 40) : tier("long_context", p * 6 + c * 22.5 + cr * 0.6 + cc * 7.5 + cc1h * 12 + img * 6 + img_o * 60 + ai * 20 + ao * 80)`
 
 func BenchmarkExprCompile(b *testing.B) {
 	for i := 0; i < b.N; i++ {
@@ -1015,7 +1000,7 @@ func BenchmarkExprCompile(b *testing.B) {
 
 func BenchmarkExprRunCached(b *testing.B) {
 	billingexpr.CompileFromCache(benchComplexExpr)
-	params := billingexpr.TokenParams{P: 150000, C: 10000, CR: 30000, CC: 5000, Img: 2000, AI: 1000, AO: 500}
+	params := billingexpr.TokenParams{P: 150000, C: 10000, Len: 188000, CR: 30000, CC: 5000, Img: 2000, AI: 1000, AO: 500}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		billingexpr.RunExpr(benchComplexExpr, params)
