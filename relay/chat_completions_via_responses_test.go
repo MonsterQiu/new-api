@@ -40,3 +40,24 @@ func TestDetectResponsesEventStreamReturnsFalseForJSONBody(t *testing.T) {
 		t.Fatalf("expected plain JSON body to stay non-stream")
 	}
 }
+
+func TestIsResponsesEventStreamContentType(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		want        bool
+	}{
+		{name: "plain", contentType: "text/event-stream", want: true},
+		{name: "mixed case with charset", contentType: "Text/Event-Stream; charset=utf-8", want: true},
+		{name: "json", contentType: "application/json", want: false},
+		{name: "empty", contentType: "", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isResponsesEventStreamContentType(tt.contentType); got != tt.want {
+				t.Fatalf("isResponsesEventStreamContentType(%q) = %v, want %v", tt.contentType, got, tt.want)
+			}
+		})
+	}
+}

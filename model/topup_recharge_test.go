@@ -50,13 +50,14 @@ func createRechargeTestTopUp(t *testing.T, userID int, tradeNo string, method st
 	t.Helper()
 
 	topUp := &TopUp{
-		UserId:        userID,
-		Amount:        10,
-		Money:         money,
-		TradeNo:       tradeNo,
-		PaymentMethod: method,
-		CreateTime:    1,
-		Status:        common.TopUpStatusPending,
+		UserId:          userID,
+		Amount:          10,
+		Money:           money,
+		TradeNo:         tradeNo,
+		PaymentMethod:   method,
+		PaymentProvider: method,
+		CreateTime:      1,
+		Status:          common.TopUpStatusPending,
 	}
 	require.NoError(t, DB.Create(topUp).Error)
 	return topUp

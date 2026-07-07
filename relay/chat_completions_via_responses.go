@@ -24,8 +24,8 @@ func detectResponsesEventStream(resp *http.Response) bool {
 		return false
 	}
 
-	contentType := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Type")))
-	if strings.HasPrefix(contentType, "text/event-stream") {
+	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	if isResponsesEventStreamContentType(contentType) {
 		return true
 	}
 
@@ -175,15 +175,15 @@ func chatCompletionsViaResponses(c *gin.Context, info *relaycommon.RelayInfo, ad
 	statusCodeMappingStr := c.GetString("status_code_mapping")
 
 	httpResp = resp.(*http.Response)
-	upstreamIsStream := detectResponsesEventStream(httpResp)
+	upstreamStream := detectResponsesEventStream(httpResp)
+	info.IsStream = clientStream || upstreamStream
 	if httpResp.StatusCode != http.StatusOK {
 		newApiErr := service.RelayErrorHandler(c.Request.Context(), httpResp, false)
 		service.ResetStatusCode(newApiErr, statusCodeMappingStr)
 		return nil, newApiErr
 	}
 
-	info.IsStream = clientStream
-	if clientStream {
+	if upstreamStream && clientStream {
 		usage, newApiErr := openaichannel.OaiResponsesToChatStreamHandler(c, info, httpResp)
 		if newApiErr != nil {
 			service.ResetStatusCode(newApiErr, statusCodeMappingStr)
@@ -191,8 +191,9 @@ func chatCompletionsViaResponses(c *gin.Context, info *relaycommon.RelayInfo, ad
 		}
 		return usage, nil
 	}
-	if upstreamIsStream {
-		usage, newApiErr := openaichannel.OaiResponsesStreamToChatHandler(c, info, httpResp)
+	if upstreamStream {
+		info.IsStream = false
+		usage, newApiErr := openaichannel.OaiResponsesToChatBufferedStreamHandler(c, info, httpResp)
 		if newApiErr != nil {
 			service.ResetStatusCode(newApiErr, statusCodeMappingStr)
 			return nil, newApiErr
@@ -206,4 +207,8 @@ func chatCompletionsViaResponses(c *gin.Context, info *relaycommon.RelayInfo, ad
 		return nil, newApiErr
 	}
 	return usage, nil
+}
+
+func isResponsesEventStreamContentType(contentType string) bool {
+	return strings.Contains(strings.ToLower(contentType), "text/event-stream")
 }

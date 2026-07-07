@@ -223,17 +223,18 @@ func TestCompleteSubscriptionOrder_GrantsInviteRebateFromPaidAmount(t *testing.T
 	require.NoError(t, DB.Create(plan).Error)
 
 	order := &SubscriptionOrder{
-		UserId:        502,
-		PlanId:        plan.Id,
-		Money:         plan.PriceAmount,
-		TradeNo:       "sub-rebate-order",
-		PaymentMethod: "alipay",
-		Status:        common.TopUpStatusPending,
-		CreateTime:    time.Now().Unix(),
+		UserId:          502,
+		PlanId:          plan.Id,
+		Money:           plan.PriceAmount,
+		TradeNo:         "sub-rebate-order",
+		PaymentMethod:   "alipay",
+		PaymentProvider: PaymentProviderEpay,
+		Status:          common.TopUpStatusPending,
+		CreateTime:      time.Now().Unix(),
 	}
 	require.NoError(t, order.Insert())
 
-	require.NoError(t, CompleteSubscriptionOrder(order.TradeNo, `{"provider":"epay"}`, "alipay"))
+	require.NoError(t, CompleteSubscriptionOrder(order.TradeNo, `{"provider":"epay"}`, PaymentProviderEpay, "alipay"))
 
 	expectedBaseQuota := int((10 / operation_setting.Price) * common.QuotaPerUnit)
 	expectedRebateQuota := int(float64(expectedBaseQuota) * common.InviteRebateRatio)
