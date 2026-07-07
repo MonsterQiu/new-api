@@ -1840,6 +1840,14 @@ const EditChannelModal = (props) => {
     localInputs.auto_ban = localInputs.auto_ban ? 1 : 0;
     localInputs.models = localInputs.models.join(',');
     localInputs.group = (localInputs.groups || []).join(',');
+    // These fields are frontend-only or managed by dedicated endpoints.
+    // Sending status to PUT /api/channel/ is rejected by the newer backend.
+    delete localInputs.status;
+    delete localInputs.groups;
+    delete localInputs.custom_model;
+    delete localInputs.azure_responses_version;
+    delete localInputs.max_input_tokens;
+    delete localInputs.region;
 
     let mode = 'single';
     if (batch) {
