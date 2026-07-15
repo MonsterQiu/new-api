@@ -29,16 +29,10 @@ interface TermsFooterProps {
 }
 
 export function TermsFooter({
-  variant = 'sign-in',
   className,
   status,
 }: TermsFooterProps) {
   const { t } = useTranslation()
-  const text =
-    variant === 'sign-in'
-      ? 'By clicking sign in, you agree to our'
-      : 'By creating an account, you agree to our'
-
   const hasUserAgreement = Boolean(status?.user_agreement_enabled)
   const hasPrivacyPolicy = Boolean(status?.privacy_policy_enabled)
 
@@ -67,13 +61,12 @@ export function TermsFooter({
 
   return (
     <p className={cn('text-muted-foreground text-center text-xs', className)}>
-      {text}{' '}
       {firstLink && (
         <a
           href={firstLink.href}
           className='hover:text-primary underline underline-offset-4'
         >
-          {firstLink.label}
+          {t(firstLink.label)}
         </a>
       )}
       {secondLink && (
@@ -84,11 +77,10 @@ export function TermsFooter({
             href={secondLink.href}
             className='hover:text-primary underline underline-offset-4'
           >
-            {secondLink.label}
+            {t(secondLink.label)}
           </a>
         </>
       )}
-      .
     </p>
   )
 }
