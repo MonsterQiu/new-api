@@ -2,6 +2,7 @@ package relay
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -116,14 +117,17 @@ func chatCompletionsViaResponses(c *gin.Context, info *relaycommon.RelayInfo, ad
 		return nil, types.NewError(err, types.ErrorCodeChannelParamOverrideInvalid, types.ErrOptionWithSkipRetry())
 	}
 
-	responsesReq, err := service.ChatCompletionsRequestToResponsesRequest(&overriddenChatReq)
+	result, err := service.ConvertRequestVia(c, info, &overriddenChatReq, types.RelayFormatOpenAI, types.RelayFormatOpenAIResponses)
 	if err != nil {
 		return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+	}
+	responsesReq, ok := result.Value.(*dto.OpenAIResponsesRequest)
+	if !ok {
+		return nil, types.NewError(fmt.Errorf("expected OpenAI responses request, got %T", result.Value), types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 	}
 	if forceUpstreamStream {
 		responsesReq.Stream = common.GetPointer(true)
 	}
-	info.AppendRequestConversion(types.RelayFormatOpenAIResponses)
 
 	savedRelayMode := info.RelayMode
 	savedRequestURLPath := info.RequestURLPath
