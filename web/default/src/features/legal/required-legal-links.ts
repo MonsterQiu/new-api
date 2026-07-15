@@ -16,6 +16,28 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export { UserAgreement } from './user-agreement'
-export { PrivacyPolicy } from './privacy-policy'
-export { RequiredLegalDocument } from './required-legal-document'
+export const REQUIRED_LEGAL_LINKS = [
+  {
+    key: 'terms-of-service',
+    path: '/terms-of-service',
+    titleKey: 'Terms of Service',
+  },
+  {
+    key: 'usage-policy',
+    path: '/usage-policy',
+    titleKey: 'Usage Policy',
+  },
+  {
+    key: 'supported-countries',
+    path: '/supported-countries',
+    titleKey: 'Supported Countries and Regions',
+  },
+  {
+    key: 'service-terms',
+    path: '/service-terms',
+    titleKey: 'Service-specific Terms',
+  },
+] as const
+
+export type RequiredLegalDocumentKey =
+  (typeof REQUIRED_LEGAL_LINKS)[number]['key']

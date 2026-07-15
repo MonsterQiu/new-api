@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { REQUIRED_LEGAL_LINKS } from '@/features/legal/required-legal-links'
 import { cn } from '@/lib/utils'
 
 import type { SystemStatus } from '../types'
@@ -40,10 +41,15 @@ export function LegalConsent({
   const { t } = useTranslation()
   const hasUserAgreement = Boolean(status?.user_agreement_enabled)
   const hasPrivacyPolicy = Boolean(status?.privacy_policy_enabled)
-
-  if (!hasUserAgreement && !hasPrivacyPolicy) {
-    return null
-  }
+  const documents = [
+    ...REQUIRED_LEGAL_LINKS,
+    ...(hasUserAgreement
+      ? [{ path: '/user-agreement', titleKey: 'User Agreement' }]
+      : []),
+    ...(hasPrivacyPolicy
+      ? [{ path: '/privacy-policy', titleKey: 'Privacy Policy' }]
+      : []),
+  ]
 
   const handleChange = (value: boolean) => {
     onCheckedChange(value === true)
@@ -68,27 +74,20 @@ export function LegalConsent({
       >
         <span>
           {t('I have read and agree to the')}{' '}
-          {hasUserAgreement && (
-            <a
-              href='/user-agreement'
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-primary hover:underline'
-            >
-              {t('User Agreement')}
-            </a>
-          )}
-          {hasUserAgreement && hasPrivacyPolicy && <> {t('and')} </>}
-          {hasPrivacyPolicy && (
-            <a
-              href='/privacy-policy'
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-primary hover:underline'
-            >
-              {t('Privacy Policy')}
-            </a>
-          )}
+          {documents.map((document, index) => (
+            <span key={document.path}>
+              {index > 0 &&
+                (index === documents.length - 1 ? ` ${t('and')} ` : ', ')}
+              <a
+                href={document.path}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='text-primary hover:underline'
+              >
+                {t(document.titleKey)}
+              </a>
+            </span>
+          ))}
           .
         </span>
       </Label>
