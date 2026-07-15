@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -250,4 +251,67 @@ func TestCompleteSubscriptionOrder_GrantsInviteRebateFromPaidAmount(t *testing.T
 	assert.Equal(t, 502, rebate.InviteeId)
 	assert.Equal(t, expectedBaseQuota, rebate.BaseQuota)
 	assert.Equal(t, expectedRebateQuota, rebate.RebateQuota)
+}
+
+func TestAdminBindSubscription_GrantsInviteRebateFromPlanPriceOnce(t *testing.T) {
+	truncateTables(t)
+
+	originalEnabled := common.InviteRebateEnabled
+	originalRatio := common.InviteRebateRatio
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalPrice := operation_setting.Price
+	common.InviteRebateEnabled = true
+	common.InviteRebateRatio = 0.15
+	common.QuotaPerUnit = 500000
+	operation_setting.Price = 1
+	t.Cleanup(func() {
+		common.InviteRebateEnabled = originalEnabled
+		common.InviteRebateRatio = originalRatio
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.Price = originalPrice
+	})
+
+	insertPaymentGuardUserWithName(t, 701, "admin_rebate_inviter", 0)
+	insertPaymentGuardUserWithName(t, 702, "admin_rebate_invitee", 701)
+
+	plan := &SubscriptionPlan{
+		Id:            801,
+		Title:         "Admin Rebate Plan",
+		PriceAmount:   20,
+		Currency:      "CNY",
+		DurationUnit:  SubscriptionDurationMonth,
+		DurationValue: 1,
+		Enabled:       true,
+		TotalAmount:   10000000,
+	}
+	require.NoError(t, DB.Create(plan).Error)
+
+	_, err := AdminBindSubscription(702, plan.Id, "")
+	require.NoError(t, err)
+
+	var subscription UserSubscription
+	require.NoError(t, DB.Where("user_id = ? AND plan_id = ? AND source = ?", 702, plan.Id, "admin").First(&subscription).Error)
+
+	expectedBaseQuota := int((plan.PriceAmount / operation_setting.Price) * common.QuotaPerUnit)
+	expectedRebateQuota := int(float64(expectedBaseQuota) * common.InviteRebateRatio)
+
+	var inviter User
+	require.NoError(t, DB.First(&inviter, 701).Error)
+	assert.Equal(t, expectedRebateQuota, inviter.AffQuota)
+	assert.Equal(t, expectedRebateQuota, inviter.AffHistoryQuota)
+
+	sourceId := fmt.Sprintf("admin-subscription-%d", subscription.Id)
+	var rebate InviteRebate
+	require.NoError(t, DB.Where("source_type = ? AND source_id = ?", InviteRebateSourceSubscription, sourceId).First(&rebate).Error)
+	assert.Equal(t, inviteRebatePaymentMethodAdmin, rebate.PaymentMethod)
+	assert.Equal(t, expectedBaseQuota, rebate.BaseQuota)
+	assert.Equal(t, expectedRebateQuota, rebate.RebateQuota)
+
+	require.NoError(t, grantAdminSubscriptionInviteRebateTx(DB, 702, plan, &subscription))
+	require.NoError(t, DB.First(&inviter, 701).Error)
+	assert.Equal(t, expectedRebateQuota, inviter.AffQuota)
+
+	var rebateCount int64
+	require.NoError(t, DB.Model(&InviteRebate{}).Where("source_type = ? AND source_id = ?", InviteRebateSourceSubscription, sourceId).Count(&rebateCount).Error)
+	assert.EqualValues(t, 1, rebateCount)
 }

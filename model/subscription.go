@@ -771,7 +771,7 @@ func ExpireSubscriptionOrder(tradeNo string, expectedPaymentProvider string) err
 	})
 }
 
-// Admin bind (no payment). Creates a UserSubscription from a plan.
+// Admin bind creates a subscription and grants the plan-price invite rebate.
 func AdminBindSubscription(userId int, planId int, sourceNote string) (string, error) {
 	if userId <= 0 || planId <= 0 {
 		return "", errors.New("invalid userId or planId")
@@ -781,8 +781,11 @@ func AdminBindSubscription(userId int, planId int, sourceNote string) (string, e
 		return "", err
 	}
 	err = DB.Transaction(func(tx *gorm.DB) error {
-		_, err := CreateUserSubscriptionFromPlanTx(tx, userId, plan, "admin")
-		return err
+		subscription, err := CreateUserSubscriptionFromPlanTx(tx, userId, plan, "admin")
+		if err != nil {
+			return err
+		}
+		return grantAdminSubscriptionInviteRebateTx(tx, userId, plan, subscription)
 	})
 	if err != nil {
 		return "", err

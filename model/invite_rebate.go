@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -14,6 +15,7 @@ import (
 const (
 	InviteRebateSourceTopUp        = "topup"
 	InviteRebateSourceSubscription = "subscription"
+	inviteRebatePaymentMethodAdmin = "admin"
 )
 
 type InviteRebate struct {
@@ -157,6 +159,28 @@ func CalculateSubscriptionInviteRebateBaseQuotaTx(tx *gorm.DB, order *Subscripti
 		amount = amount.Div(decimal.NewFromFloat(price)).Div(decimal.NewFromFloat(topupGroupRatio))
 	}
 	return int(amount.Mul(quotaPerUnit).IntPart())
+}
+
+func grantAdminSubscriptionInviteRebateTx(tx *gorm.DB, userId int, plan *SubscriptionPlan, subscription *UserSubscription) error {
+	if tx == nil || plan == nil || subscription == nil || subscription.Id <= 0 {
+		return nil
+	}
+	order := &SubscriptionOrder{
+		UserId:        userId,
+		Money:         plan.PriceAmount,
+		PaymentMethod: inviteRebatePaymentMethodAdmin,
+	}
+	baseQuota := CalculateSubscriptionInviteRebateBaseQuotaTx(tx, order, plan)
+	_, err := GrantInviteRebateTx(tx, InviteRebateGrantParams{
+		InviteeId:     userId,
+		SourceType:    InviteRebateSourceSubscription,
+		SourceId:      fmt.Sprintf("admin-subscription-%d", subscription.Id),
+		PaymentMethod: inviteRebatePaymentMethodAdmin,
+		BaseQuota:     baseQuota,
+		BaseAmount:    plan.PriceAmount,
+		Currency:      plan.Currency,
+	})
+	return err
 }
 
 func subscriptionOrderUsesRechargePrice(order *SubscriptionOrder, plan *SubscriptionPlan) bool {
