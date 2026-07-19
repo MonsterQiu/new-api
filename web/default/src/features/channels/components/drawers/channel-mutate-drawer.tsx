@@ -173,6 +173,7 @@ import {
 import type { Channel } from '../../types'
 import { useChannels } from '../channels-provider'
 import { AdvancedCustomEditorDialog } from '../dialogs/advanced-custom-editor-dialog'
+import { CodexOAuthDialog } from '../dialogs/codex-oauth-dialog'
 import { FetchModelsDialog } from '../dialogs/fetch-models-dialog'
 import {
   MissingModelsConfirmationDialog,
@@ -615,6 +616,7 @@ export function ChannelMutateDrawer({
   const [fetchModelsDialogOpen, setFetchModelsDialogOpen] = useState(false)
   const [channelKey, setChannelKey] = useState<string | null>(null)
   const [isChannelKeyLoading, setIsChannelKeyLoading] = useState(false)
+  const [codexOAuthDialogOpen, setCodexOAuthDialogOpen] = useState(false)
   const [isCodexCredentialRefreshing, setIsCodexCredentialRefreshing] =
     useState(false)
   const initialModelsRef = useRef<string[]>([])
@@ -693,6 +695,7 @@ export function ChannelMutateDrawer({
     if (!open) {
       setChannelKey(null)
       setIsChannelKeyLoading(false)
+      setCodexOAuthDialogOpen(false)
     } else if (channelId) {
       setChannelKey(null)
     }
@@ -3058,6 +3061,23 @@ export function ChannelMutateDrawer({
                                       )}
                                     </div>
                                     <div className='flex flex-wrap items-center gap-2'>
+                                      <Button
+                                        type='button'
+                                        variant='outline'
+                                        size='sm'
+                                        onClick={() =>
+                                          setCodexOAuthDialogOpen(true)
+                                        }
+                                        disabled={sensitiveLocked}
+                                      >
+                                        <KeyRound
+                                          data-icon='inline-start'
+                                          aria-hidden='true'
+                                        />
+                                        {isEditing
+                                          ? t('Reauthorize')
+                                          : t('Authorize')}
+                                      </Button>
                                       {isEditing && channelId && (
                                         <Button
                                           type='button'
@@ -4666,6 +4686,19 @@ export function ChannelMutateDrawer({
           onOpenChange={setAdvancedCustomEditorOpen}
           onSave={(nextValue) => {
             form.setValue('advanced_custom', nextValue, {
+              shouldDirty: true,
+              shouldValidate: true,
+            })
+          }}
+        />
+      )}
+
+      {codexOAuthDialogOpen && !sensitiveLocked && (
+        <CodexOAuthDialog
+          open={codexOAuthDialogOpen}
+          onOpenChange={setCodexOAuthDialogOpen}
+          onKeyGenerated={(key) => {
+            form.setValue('key', key, {
               shouldDirty: true,
               shouldValidate: true,
             })
