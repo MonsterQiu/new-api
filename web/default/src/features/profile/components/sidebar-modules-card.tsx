@@ -103,6 +103,11 @@ export function SidebarModulesCard() {
           title: t('Task Logs'),
           description: t('System task records'),
         },
+        {
+          key: 'drawingTool',
+          title: t('Drawing'),
+          description: t('Open the external drawing workspace.'),
+        },
       ],
     },
     {

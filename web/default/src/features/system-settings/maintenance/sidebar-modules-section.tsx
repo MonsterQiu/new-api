@@ -118,6 +118,10 @@ export function SidebarModulesSection({
         title: t('Task logs'),
         description: t('Background job tracker for queued work.'),
       },
+      drawingTool: {
+        title: t('Drawing'),
+        description: t('Open the external drawing workspace.'),
+      },
     },
     personal: {
       topup: {

@@ -26,6 +26,7 @@ import {
   LayoutDashboard,
   ListTodo,
   MessageSquare,
+  Paintbrush,
   Radio,
   ServerCog,
   Settings,
@@ -36,7 +37,8 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { type SidebarData } from '@/components/layout/types'
+import { DRAWING_TOOL_URL } from '@/components/layout/constants'
+import type { SidebarData } from '@/components/layout/types'
 import { ROLE } from '@/lib/roles'
 
 /**
@@ -63,6 +65,12 @@ export function useSidebarData(): SidebarData {
             title: t('Chat'),
             icon: MessageSquare,
             type: 'chat-presets',
+          },
+          {
+            title: t('Drawing'),
+            url: DRAWING_TOOL_URL,
+            icon: Paintbrush,
+            external: true,
           },
         ],
       },

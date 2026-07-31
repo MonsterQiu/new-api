@@ -20,6 +20,9 @@ For commercial licensing, please contact support@quantumnous.com
  * Layout constants and configurations
  */
 
+/** External drawing workspace opened from the application sidebar. */
+export const DRAWING_TOOL_URL = 'https://raincanvas.im/'
+
 /**
  * Animation variants for mobile drawer
  */
