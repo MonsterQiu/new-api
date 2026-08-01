@@ -10,7 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UserAgreementRouteImport } from './routes/user-agreement'
+import { Route as UsagePolicyRouteImport } from './routes/usage-policy'
+import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
+import { Route as SupportedCountriesRouteImport } from './routes/supported-countries'
+import { Route as ServiceTermsRouteImport } from './routes/service-terms'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
+import { Route as DocsRouteImport } from './routes/docs'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as authRouteRouteImport } from './routes/(auth)/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -75,9 +80,34 @@ const UserAgreementRoute = UserAgreementRouteImport.update({
   path: '/user-agreement',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UsagePolicyRoute = UsagePolicyRouteImport.update({
+  id: '/usage-policy',
+  path: '/usage-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
+  id: '/terms-of-service',
+  path: '/terms-of-service',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportedCountriesRoute = SupportedCountriesRouteImport.update({
+  id: '/supported-countries',
+  path: '/supported-countries',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServiceTermsRoute = ServiceTermsRouteImport.update({
+  id: '/service-terms',
+  path: '/service-terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
   id: '/privacy-policy',
   path: '/privacy-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsRoute = DocsRouteImport.update({
+  id: '/docs',
+  path: '/docs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -401,7 +431,12 @@ const AuthenticatedSystemSettingsAuthSectionRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/docs': typeof DocsRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/service-terms': typeof ServiceTermsRoute
+  '/supported-countries': typeof SupportedCountriesRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
+  '/usage-policy': typeof UsagePolicyRoute
   '/user-agreement': typeof UserAgreementRoute
   '/system-settings': typeof AuthenticatedSystemSettingsRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
@@ -461,7 +496,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/docs': typeof DocsRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/service-terms': typeof ServiceTermsRoute
+  '/supported-countries': typeof SupportedCountriesRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
+  '/usage-policy': typeof UsagePolicyRoute
   '/user-agreement': typeof UserAgreementRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/oauth': typeof authOauthRoute
@@ -523,7 +563,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/(auth)': typeof authRouteRouteWithChildren
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/docs': typeof DocsRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/service-terms': typeof ServiceTermsRoute
+  '/supported-countries': typeof SupportedCountriesRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
+  '/usage-policy': typeof UsagePolicyRoute
   '/user-agreement': typeof UserAgreementRoute
   '/_authenticated/system-settings': typeof AuthenticatedSystemSettingsRouteRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
@@ -585,7 +630,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/docs'
     | '/privacy-policy'
+    | '/service-terms'
+    | '/supported-countries'
+    | '/terms-of-service'
+    | '/usage-policy'
     | '/user-agreement'
     | '/system-settings'
     | '/forgot-password'
@@ -645,7 +695,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/docs'
     | '/privacy-policy'
+    | '/service-terms'
+    | '/supported-countries'
+    | '/terms-of-service'
+    | '/usage-policy'
     | '/user-agreement'
     | '/forgot-password'
     | '/oauth'
@@ -706,7 +761,12 @@ export interface FileRouteTypes {
     | '/'
     | '/(auth)'
     | '/_authenticated'
+    | '/docs'
     | '/privacy-policy'
+    | '/service-terms'
+    | '/supported-countries'
+    | '/terms-of-service'
+    | '/usage-policy'
     | '/user-agreement'
     | '/_authenticated/system-settings'
     | '/(auth)/forgot-password'
@@ -769,7 +829,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   authRouteRoute: typeof authRouteRouteWithChildren
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  DocsRoute: typeof DocsRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
+  ServiceTermsRoute: typeof ServiceTermsRoute
+  SupportedCountriesRoute: typeof SupportedCountriesRoute
+  TermsOfServiceRoute: typeof TermsOfServiceRoute
+  UsagePolicyRoute: typeof UsagePolicyRoute
   UserAgreementRoute: typeof UserAgreementRoute
   errors401Route: typeof errors401Route
   errors403Route: typeof errors403Route
@@ -795,11 +860,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserAgreementRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/usage-policy': {
+      id: '/usage-policy'
+      path: '/usage-policy'
+      fullPath: '/usage-policy'
+      preLoaderRoute: typeof UsagePolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms-of-service': {
+      id: '/terms-of-service'
+      path: '/terms-of-service'
+      fullPath: '/terms-of-service'
+      preLoaderRoute: typeof TermsOfServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/supported-countries': {
+      id: '/supported-countries'
+      path: '/supported-countries'
+      fullPath: '/supported-countries'
+      preLoaderRoute: typeof SupportedCountriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/service-terms': {
+      id: '/service-terms'
+      path: '/service-terms'
+      fullPath: '/service-terms'
+      preLoaderRoute: typeof ServiceTermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacy-policy': {
       id: '/privacy-policy'
       path: '/privacy-policy'
       fullPath: '/privacy-policy'
       preLoaderRoute: typeof PrivacyPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs': {
+      id: '/docs'
+      path: '/docs'
+      fullPath: '/docs'
+      preLoaderRoute: typeof DocsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -1347,7 +1447,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   authRouteRoute: authRouteRouteWithChildren,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  DocsRoute: DocsRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
+  ServiceTermsRoute: ServiceTermsRoute,
+  SupportedCountriesRoute: SupportedCountriesRoute,
+  TermsOfServiceRoute: TermsOfServiceRoute,
+  UsagePolicyRoute: UsagePolicyRoute,
   UserAgreementRoute: UserAgreementRoute,
   errors401Route: errors401Route,
   errors403Route: errors403Route,

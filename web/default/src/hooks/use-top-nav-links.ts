@@ -93,6 +93,7 @@ export function useTopNavLinks(): TopNavLink[] {
     } else {
       links.push({ title: t('Docs'), href: '/docs' })
     }
+    links.push({ title: t('Usage guide'), href: '/docs' })
   }
 
   // About
