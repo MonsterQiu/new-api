@@ -70,6 +70,38 @@ func TestAuthFlowExpiryIsEnforced(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrAuthFlowExpired))
 }
 
+func TestAuthFlowAcceptsExternalOAuthState(t *testing.T) {
+	truncateTables(t)
+	state := "0123456789abcdef0123456789abcdef"
+	match := AuthFlowMatch{
+		Purpose:   AuthFlowPurposeCodexOAuth,
+		Provider:  "codex",
+		UserId:    42,
+		SessionId: "session-a",
+	}
+
+	created, err := CreateAuthFlowWithToken(state, AuthFlowCreate{
+		Purpose:   match.Purpose,
+		Provider:  match.Provider,
+		UserId:    match.UserId,
+		SessionId: match.SessionId,
+		Payload:   `{"verifier":"pkce-verifier","channel_id":7}`,
+		ExpiresAt: time.Now().Add(time.Minute),
+	})
+	require.NoError(t, err)
+	assert.NotEqual(t, state, created.TokenHash)
+
+	peeked, err := GetAuthFlow(state, match)
+	require.NoError(t, err)
+	assert.Equal(t, created.Id, peeked.Id)
+
+	_, err = CreateAuthFlowWithToken("predictable", AuthFlowCreate{
+		Purpose:   AuthFlowPurposeCodexOAuth,
+		ExpiresAt: time.Now().Add(time.Minute),
+	})
+	assert.ErrorIs(t, err, ErrAuthFlowInvalid)
+}
+
 func TestExternalAuthAssertionCanOnlyBeClaimedOnce(t *testing.T) {
 	truncateTables(t)
 	expiresAt := time.Now().Add(time.Minute)

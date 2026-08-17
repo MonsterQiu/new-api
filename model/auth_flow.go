@@ -16,6 +16,7 @@ import (
 
 const (
 	AuthFlowPurposeOAuth             = "oauth"
+	AuthFlowPurposeCodexOAuth        = "codex_oauth"
 	AuthFlowPurposeTwoFALogin        = "2fa_login"
 	AuthFlowPurposePasskeyLogin      = "passkey_login"
 	AuthFlowPurposePasskeyRegister   = "passkey_register"
@@ -25,6 +26,7 @@ const (
 	AuthFlowIntentLogin              = "login"
 	AuthFlowIntentBind               = "bind"
 	AuthFlowTokenBytes               = 32
+	AuthFlowMinimumTokenLength       = 32
 	AuthFlowDefaultCleanupRetention  = 24 * time.Hour
 )
 
@@ -94,14 +96,23 @@ func authFlowTokenHash(token string) string {
 }
 
 func CreateAuthFlow(input AuthFlowCreate) (string, *AuthFlow, error) {
-	if strings.TrimSpace(input.Purpose) == "" || input.ExpiresAt.IsZero() || !input.ExpiresAt.After(time.Now()) {
-		return "", nil, ErrAuthFlowInvalid
-	}
 	random := make([]byte, AuthFlowTokenBytes)
 	if _, err := rand.Read(random); err != nil {
 		return "", nil, fmt.Errorf("generate auth flow token: %w", err)
 	}
 	token := base64.RawURLEncoding.EncodeToString(random)
+	flow, err := CreateAuthFlowWithToken(token, input)
+	return token, flow, err
+}
+
+// CreateAuthFlowWithToken stores a cryptographically random token supplied by
+// an external authentication protocol, allowing that protocol's state value to
+// remain the one-time lookup token without persisting it in plaintext.
+func CreateAuthFlowWithToken(token string, input AuthFlowCreate) (*AuthFlow, error) {
+	if len(token) < AuthFlowMinimumTokenLength || strings.TrimSpace(token) != token ||
+		strings.TrimSpace(input.Purpose) == "" || input.ExpiresAt.IsZero() || !input.ExpiresAt.After(time.Now()) {
+		return nil, ErrAuthFlowInvalid
+	}
 	flow := &AuthFlow{
 		TokenHash: authFlowTokenHash(token),
 		Purpose:   input.Purpose,
@@ -113,9 +124,9 @@ func CreateAuthFlow(input AuthFlowCreate) (string, *AuthFlow, error) {
 		ExpiresAt: input.ExpiresAt,
 	}
 	if err := DB.Create(flow).Error; err != nil {
-		return "", nil, err
+		return nil, err
 	}
-	return token, flow, nil
+	return flow, nil
 }
 
 // ClaimExternalAuthAssertion records a signed provider assertion as consumed.
