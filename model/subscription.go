@@ -172,9 +172,6 @@ type SubscriptionPlan struct {
 	// Max purchases per user (0 = unlimited)
 	MaxPurchasePerUser int `json:"max_purchase_per_user" gorm:"type:int;default:0"`
 
-	// Max total purchases across all users (0 = unlimited)
-	TotalPurchaseLimit int `json:"total_purchase_limit" gorm:"type:int;default:0"`
-
 	// Upgrade user group after purchase (empty = no change)
 	UpgradeGroup string `json:"upgrade_group" gorm:"type:varchar(64);default:''"`
 
@@ -295,42 +292,6 @@ func (s *UserSubscription) BeforeUpdate(tx *gorm.DB) error {
 	return nil
 }
 
-type subscriptionPlanPurchaseCountRow struct {
-	PlanId             int   `gorm:"column:plan_id"`
-	PurchaseUserCount  int64 `gorm:"column:purchase_user_count"`
-	TotalPurchaseCount int64 `gorm:"column:total_purchase_count"`
-}
-
-type SubscriptionPlanStats struct {
-	PurchaseUserCount  int64
-	TotalPurchaseCount int64
-}
-
-func GetSubscriptionPlanStats(planIds []int) (map[int]SubscriptionPlanStats, error) {
-	stats := make(map[int]SubscriptionPlanStats, len(planIds))
-	if len(planIds) == 0 {
-		return stats, nil
-	}
-
-	rows := make([]subscriptionPlanPurchaseCountRow, 0, len(planIds))
-	err := DB.Model(&UserSubscription{}).
-		Select("plan_id, COUNT(DISTINCT user_id) AS purchase_user_count, COUNT(*) AS total_purchase_count").
-		Where("plan_id IN ?", planIds).
-		Group("plan_id").
-		Scan(&rows).Error
-	if err != nil {
-		return nil, err
-	}
-
-	for _, row := range rows {
-		stats[row.PlanId] = SubscriptionPlanStats{
-			PurchaseUserCount:  row.PurchaseUserCount,
-			TotalPurchaseCount: row.TotalPurchaseCount,
-		}
-	}
-	return stats, nil
-}
-
 type SubscriptionSummary struct {
 	Subscription *UserSubscription `json:"subscription"`
 }
@@ -429,9 +390,8 @@ func getSubscriptionPlanByIdTx(tx *gorm.DB, id int) (*SubscriptionPlan, error) {
 	if id <= 0 {
 		return nil, errors.New("invalid plan id")
 	}
-	key := ""
-	if tx == nil {
-		key = subscriptionPlanCacheKey(id)
+	key := subscriptionPlanCacheKey(id)
+	if key != "" {
 		if cached, found, err := getSubscriptionPlanCache().Get(key); err == nil && found {
 			cached.NormalizeDefaults()
 			return &cached, nil
@@ -446,9 +406,7 @@ func getSubscriptionPlanByIdTx(tx *gorm.DB, id int) (*SubscriptionPlan, error) {
 		return nil, err
 	}
 	plan.NormalizeDefaults()
-	if tx == nil && key != "" {
-		_ = getSubscriptionPlanCache().SetWithTTL(key, plan, subscriptionPlanCacheTTL())
-	}
+	_ = getSubscriptionPlanCache().SetWithTTL(key, plan, subscriptionPlanCacheTTL())
 	return &plan, nil
 }
 
@@ -465,19 +423,6 @@ func CountUserSubscriptionsByPlan(userId int, planId int) (int64, error) {
 	return count, nil
 }
 
-func CountSubscriptionsByPlan(planId int) (int64, error) {
-	if planId <= 0 {
-		return 0, errors.New("invalid planId")
-	}
-	var count int64
-	if err := DB.Model(&UserSubscription{}).
-		Where("plan_id = ?", planId).
-		Count(&count).Error; err != nil {
-		return 0, err
-	}
-	return count, nil
-}
-
 func getUserGroupByIdTx(tx *gorm.DB, userId int) (string, error) {
 	if userId <= 0 {
 		return "", errors.New("invalid userId")
@@ -486,7 +431,7 @@ func getUserGroupByIdTx(tx *gorm.DB, userId int) (string, error) {
 		tx = DB
 	}
 	var group string
-	if err := tx.Model(&User{}).Where("id = ?", userId).Select(commonGroupCol).Find(&group).Error; err != nil {
+	if err := lockForUpdate(tx).Model(&User{}).Where("id = ?", userId).Select(commonGroupCol).Find(&group).Error; err != nil {
 		return "", err
 	}
 	return group, nil
@@ -557,18 +502,7 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 			return nil, errors.New("已达到该套餐购买上限")
 		}
 	}
-	if plan.TotalPurchaseLimit > 0 {
-		var count int64
-		if err := tx.Model(&UserSubscription{}).
-			Where("plan_id = ?", plan.Id).
-			Count(&count).Error; err != nil {
-			return nil, err
-		}
-		if count >= int64(plan.TotalPurchaseLimit) {
-			return nil, errors.New("该套餐已售罄")
-		}
-	}
-	nowUnix := getDBTimestampTx(tx)
+	nowUnix := GetDBTimestamp()
 	now := time.Unix(nowUnix, 0)
 	endUnix, err := calcPlanEndTime(now, plan)
 	if err != nil {
@@ -623,6 +557,12 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 	return sub, nil
 }
 
+func refreshSubscriptionUserGroupCache(userId int, operation string) {
+	if err := RefreshUserGroupCache(userId); err != nil {
+		common.SysError(fmt.Sprintf("failed to refresh user group cache after %s for user %d: %v", operation, userId, err))
+	}
+}
+
 // Complete a subscription order (idempotent). Creates a UserSubscription snapshot from the plan.
 // expectedPaymentProvider guards against cross-gateway callback attacks (empty skips the check).
 // actualPaymentMethod updates the order's PaymentMethod to reflect the real payment type used (empty skips update).
@@ -653,20 +593,31 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		if order.Status != common.TopUpStatusPending {
 			return ErrSubscriptionOrderStatusInvalid
 		}
-		plan, err := getSubscriptionPlanByIdTx(tx, order.PlanId)
+		plan, err := GetSubscriptionPlanById(order.PlanId)
 		if err != nil {
 			return err
 		}
 		if !plan.Enabled {
 			// still allow completion for already purchased orders
 		}
-		upgradeGroup = strings.TrimSpace(plan.UpgradeGroup)
-		_, err = CreateUserSubscriptionFromPlanTx(tx, order.UserId, plan, "order")
+		// 锁定用户行：并发完成同一用户的不同订单（包括多实例部署下）时，
+		// 使 CreateUserSubscriptionFromPlanTx 的 MaxPurchasePerUser 检查按用户串行。
+		var userRow User
+		if err := lockForUpdate(tx).Select("id").Where("id = ?", order.UserId).First(&userRow).Error; err != nil {
+			return err
+		}
+		subscription, err := CreateUserSubscriptionFromPlanTx(tx, order.UserId, plan, "order")
 		if err != nil {
 			return err
 		}
+		if subscription.PrevUserGroup != "" {
+			upgradeGroup = strings.TrimSpace(subscription.UpgradeGroup)
+		}
 		if err := upsertSubscriptionTopUpTx(tx, &order); err != nil {
 			return err
+		}
+		if actualPaymentMethod != "" && order.PaymentMethod != actualPaymentMethod {
+			order.PaymentMethod = actualPaymentMethod
 		}
 		baseQuota := CalculateSubscriptionInviteRebateBaseQuotaTx(tx, &order, plan)
 		if _, err := GrantInviteRebateTx(tx, InviteRebateGrantParams{
@@ -685,9 +636,6 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		if providerPayload != "" {
 			order.ProviderPayload = providerPayload
 		}
-		if actualPaymentMethod != "" && order.PaymentMethod != actualPaymentMethod {
-			order.PaymentMethod = actualPaymentMethod
-		}
 		if err := tx.Save(&order).Error; err != nil {
 			return err
 		}
@@ -701,7 +649,7 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		return err
 	}
 	if upgradeGroup != "" && logUserId > 0 {
-		_ = UpdateUserGroupCache(logUserId, upgradeGroup)
+		refreshSubscriptionUserGroupCache(logUserId, "subscription payment completion")
 	}
 	if logUserId > 0 {
 		msg := fmt.Sprintf("订阅购买成功，套餐: %s，支付金额: %.2f，支付方式: %s", logPlanTitle, logMoney, logPaymentMethod)
@@ -771,7 +719,7 @@ func ExpireSubscriptionOrder(tradeNo string, expectedPaymentProvider string) err
 	})
 }
 
-// Admin bind creates a subscription and grants the plan-price invite rebate.
+// Admin bind (no payment). Creates a UserSubscription from a plan.
 func AdminBindSubscription(userId int, planId int, sourceNote string) (string, error) {
 	if userId <= 0 || planId <= 0 {
 		return "", errors.New("invalid userId or planId")
@@ -780,18 +728,25 @@ func AdminBindSubscription(userId int, planId int, sourceNote string) (string, e
 	if err != nil {
 		return "", err
 	}
+	groupChanged := false
 	err = DB.Transaction(func(tx *gorm.DB) error {
+		// 与 CompleteSubscriptionOrder 一致：先锁用户行，再做购买次数检查。
+		var userRow User
+		if err := lockForUpdate(tx).Select("id").Where("id = ?", userId).First(&userRow).Error; err != nil {
+			return err
+		}
 		subscription, err := CreateUserSubscriptionFromPlanTx(tx, userId, plan, "admin")
 		if err != nil {
 			return err
 		}
+		groupChanged = subscription.PrevUserGroup != ""
 		return grantAdminSubscriptionInviteRebateTx(tx, userId, plan, subscription)
 	})
 	if err != nil {
 		return "", err
 	}
-	if strings.TrimSpace(plan.UpgradeGroup) != "" {
-		_ = UpdateUserGroupCache(userId, plan.UpgradeGroup)
+	if groupChanged {
+		refreshSubscriptionUserGroupCache(userId, "admin subscription creation")
 		return fmt.Sprintf("用户分组将升级到 %s", plan.UpgradeGroup), nil
 	}
 	return "", nil
@@ -806,9 +761,8 @@ func calcSubscriptionBalanceQuota(priceAmount float64) (int, error) {
 	}
 	quota := decimal.NewFromFloat(priceAmount).
 		Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
-		Ceil().
-		IntPart()
-	return int(quota), nil
+		Ceil()
+	return common.QuotaFromDecimalStrict(quota)
 }
 
 // PurchaseSubscriptionWithBalance creates a subscription by deducting the user's wallet quota.
@@ -855,7 +809,8 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 			}
 		}
 
-		if _, err := CreateUserSubscriptionFromPlanTx(tx, userId, plan, PaymentMethodBalance); err != nil {
+		subscription, err := CreateUserSubscriptionFromPlanTx(tx, userId, plan, PaymentMethodBalance)
+		if err != nil {
 			return err
 		}
 
@@ -880,7 +835,9 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 		logPlanTitle = plan.Title
 		logMoney = plan.PriceAmount
 		chargedQuota = requiredQuota
-		upgradeGroup = strings.TrimSpace(plan.UpgradeGroup)
+		if subscription.PrevUserGroup != "" {
+			upgradeGroup = strings.TrimSpace(subscription.UpgradeGroup)
+		}
 		return nil
 	})
 	if err != nil {
@@ -893,7 +850,7 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 		}
 	}
 	if upgradeGroup != "" {
-		_ = UpdateUserGroupCache(userId, upgradeGroup)
+		refreshSubscriptionUserGroupCache(userId, "subscription balance purchase")
 	}
 	msg := fmt.Sprintf("使用余额购买订阅成功，套餐: %s，支付金额: %.2f，扣除额度: %d", logPlanTitle, logMoney, chargedQuota)
 	RecordLog(userId, LogTypeTopup, msg)
@@ -1016,7 +973,7 @@ func AdminInvalidateUserSubscription(userSubscriptionId int) (string, error) {
 		return "", err
 	}
 	if cacheGroup != "" && userId > 0 {
-		_ = UpdateUserGroupCache(userId, cacheGroup)
+		refreshSubscriptionUserGroupCache(userId, "admin subscription update")
 	}
 	if downgradeGroup != "" {
 		return fmt.Sprintf("用户分组将回退到 %s", downgradeGroup), nil
@@ -1057,7 +1014,7 @@ func AdminDeleteUserSubscription(userSubscriptionId int) (string, error) {
 		return "", err
 	}
 	if cacheGroup != "" && userId > 0 {
-		_ = UpdateUserGroupCache(userId, cacheGroup)
+		refreshSubscriptionUserGroupCache(userId, "admin subscription deletion")
 	}
 	if downgradeGroup != "" {
 		return fmt.Sprintf("用户分组将回退到 %s", downgradeGroup), nil
@@ -1284,7 +1241,7 @@ func ExpireDueSubscriptions(limit int) (int, error) {
 			return expiredCount, err
 		}
 		if cacheGroup != "" {
-			_ = UpdateUserGroupCache(userId, cacheGroup)
+			refreshSubscriptionUserGroupCache(userId, "subscription expiration")
 		}
 	}
 	return expiredCount, nil
@@ -1312,25 +1269,6 @@ func (r *SubscriptionPreConsumeRecord) BeforeCreate(tx *gorm.DB) error {
 func (r *SubscriptionPreConsumeRecord) BeforeUpdate(tx *gorm.DB) error {
 	r.UpdatedAt = common.GetTimestamp()
 	return nil
-}
-
-func normalizeExcludedSubscriptionPlanIDs(ids []int) []int {
-	if len(ids) == 0 {
-		return nil
-	}
-	seen := make(map[int]struct{}, len(ids))
-	normalized := make([]int, 0, len(ids))
-	for _, id := range ids {
-		if id <= 0 {
-			continue
-		}
-		if _, exists := seen[id]; exists {
-			continue
-		}
-		seen[id] = struct{}{}
-		normalized = append(normalized, id)
-	}
-	return normalized
 }
 
 func maybeResetUserSubscriptionWithPlanTx(tx *gorm.DB, sub *UserSubscription, plan *SubscriptionPlan, now int64) error {
@@ -1371,12 +1309,6 @@ func maybeResetUserSubscriptionWithPlanTx(tx *gorm.DB, sub *UserSubscription, pl
 
 // PreConsumeUserSubscription pre-consumes from any active subscription total quota.
 func PreConsumeUserSubscription(requestId string, userId int, modelName string, quotaType int, amount int64) (*SubscriptionPreConsumeResult, error) {
-	return PreConsumeUserSubscriptionWithExcludedPlanIDs(requestId, userId, modelName, quotaType, amount, nil)
-}
-
-// PreConsumeUserSubscriptionWithExcludedPlanIDs pre-consumes from active subscriptions,
-// skipping configured plan IDs for model-specific billing restrictions.
-func PreConsumeUserSubscriptionWithExcludedPlanIDs(requestId string, userId int, modelName string, quotaType int, amount int64, excludedPlanIDs []int) (*SubscriptionPreConsumeResult, error) {
 	if userId <= 0 {
 		return nil, errors.New("invalid userId")
 	}
@@ -1412,15 +1344,11 @@ func PreConsumeUserSubscriptionWithExcludedPlanIDs(requestId string, userId int,
 			return nil
 		}
 
-		excludedPlanIDs = normalizeExcludedSubscriptionPlanIDs(excludedPlanIDs)
 		var subs []UserSubscription
-		subQuery := lockForUpdate(tx).
+		if err := lockForUpdate(tx).
 			Where("user_id = ? AND status = ? AND end_time > ?", userId, "active", now).
-			Order("end_time asc, id asc")
-		if len(excludedPlanIDs) > 0 {
-			subQuery = subQuery.Where("plan_id NOT IN ?", excludedPlanIDs)
-		}
-		if err := subQuery.Find(&subs).Error; err != nil {
+			Order("end_time asc, id asc").
+			Find(&subs).Error; err != nil {
 			return errors.New("no active subscription")
 		}
 		if len(subs) == 0 {

@@ -3,6 +3,9 @@ package model_setting
 import (
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClaudeSettingsWriteHeadersMergesConfiguredValuesIntoSingleHeader(t *testing.T) {
@@ -59,48 +62,31 @@ func TestClaudeSettingsWriteHeadersDeduplicatesAcrossCommaSeparatedAndRepeatedVa
 	}
 }
 
-func TestIsClaudeModelNameMatchesCommonClaudePrefixes(t *testing.T) {
-	models := []string{
-		"claude-3-5-sonnet-20240620",
-		"claude-sonnet-4-20250514-thinking",
-		"anthropic/claude-3.7-sonnet",
-		"anthropic.claude-3-sonnet-20240229-v1:0",
+func TestValidateClaudeDefaultMaxTokens(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		wantErr string
+	}{
+		{name: "positive default", value: `{"default": 8192}`},
+		{name: "zero allowed", value: `{"default": 0}`},
+		{name: "zero model override allowed", value: `{"default": 8192, "claude-test": 0}`},
+		{name: "empty map allowed", value: `{}`},
+		{name: "negative default rejected", value: `{"default": -1}`, wantErr: `negative Claude default max_tokens -1 for "default"`},
+		{name: "negative model override rejected", value: `{"default": 8192, "claude-test": -5}`, wantErr: `negative Claude default max_tokens -5 for "claude-test"`},
+		{name: "non-integer rejected", value: `{"default": "high"}`, wantErr: "JSON map of model to integer"},
+		{name: "null rejected", value: `null`, wantErr: "JSON map of model to integer"},
+		{name: "malformed rejected", value: `{`, wantErr: "JSON map of model to integer"},
 	}
-	for _, model := range models {
-		if !IsClaudeModelName(model) {
-			t.Fatalf("expected %q to be detected as Claude", model)
-		}
-	}
-}
-
-func TestClaudeExcludedSubscriptionPlanIDsForModelNormalizesConfiguredIDs(t *testing.T) {
-	previous := claudeSettings
-	t.Cleanup(func() {
-		claudeSettings = previous
-	})
-	claudeSettings.ExcludedSubscriptionPlanIDs = []int{1, 0, 2, 2, -3, 7}
-
-	got := GetClaudeExcludedSubscriptionPlanIDsForModel("claude-3-5-sonnet-20240620")
-
-	expected := []int{1, 2, 7}
-	if len(got) != len(expected) {
-		t.Fatalf("expected %v, got %v", expected, got)
-	}
-	for i := range expected {
-		if got[i] != expected[i] {
-			t.Fatalf("expected %v, got %v", expected, got)
-		}
-	}
-}
-
-func TestClaudeExcludedSubscriptionPlanIDsForModelSkipsNonClaudeModels(t *testing.T) {
-	previous := claudeSettings
-	t.Cleanup(func() {
-		claudeSettings = previous
-	})
-	claudeSettings.ExcludedSubscriptionPlanIDs = []int{1, 2, 7}
-
-	if got := GetClaudeExcludedSubscriptionPlanIDsForModel("gpt-4o"); len(got) != 0 {
-		t.Fatalf("expected non-Claude model to have no excluded plan IDs, got %v", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateClaudeDefaultMaxTokens(tt.value)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
 	}
 }

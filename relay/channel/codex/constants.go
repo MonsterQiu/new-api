@@ -12,7 +12,7 @@ var baseModelList = []string{
 	"gpt-5.4", "gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
 }
 
-var ModelList = withCompactModelSuffix(baseModelList)
+var ModelList = withCompactModelSuffix(append(baseModelList, "gpt-5.4-mini", "codex-auto-review"))
 
 const ChannelName = "codex"
 

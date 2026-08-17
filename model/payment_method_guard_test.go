@@ -1,17 +1,15 @@
 package model
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func insertUserForPaymentGuardTest(t *testing.T, id int, quota int) {
+func insertUserForPaymentGuardTest(t *testing.T, id int, quota int) *User {
 	t.Helper()
 	user := &User{
 		Id:       id,
@@ -20,21 +18,7 @@ func insertUserForPaymentGuardTest(t *testing.T, id int, quota int) {
 		Quota:    quota,
 	}
 	require.NoError(t, DB.Create(user).Error)
-}
-
-func insertPaymentGuardUserWithName(t *testing.T, id int, username string, inviterID int) {
-	t.Helper()
-	user := &User{
-		Id:        id,
-		Username:  username,
-		Password:  "pass12345",
-		Status:    common.UserStatusEnabled,
-		Role:      common.RoleCommonUser,
-		Group:     "default",
-		AffCode:   username + "_aff",
-		InviterId: inviterID,
-	}
-	require.NoError(t, DB.Create(user).Error)
+	return user
 }
 
 func insertSubscriptionPlanForPaymentGuardTest(t *testing.T, id int) *SubscriptionPlan {
@@ -190,128 +174,182 @@ func TestExpireSubscriptionOrder_RejectsMismatchedPaymentProvider(t *testing.T) 
 	assert.Equal(t, common.TopUpStatusPending, order.Status)
 }
 
-func TestCompleteSubscriptionOrder_GrantsInviteRebateFromPaidAmount(t *testing.T) {
-	truncateTables(t)
-
-	originalEnabled := common.InviteRebateEnabled
-	originalRatio := common.InviteRebateRatio
-	originalQuotaPerUnit := common.QuotaPerUnit
-	originalPrice := operation_setting.Price
-	common.InviteRebateEnabled = true
-	common.InviteRebateRatio = 0.2
-	common.QuotaPerUnit = 500000
-	operation_setting.Price = 0.5
-	t.Cleanup(func() {
-		common.InviteRebateEnabled = originalEnabled
-		common.InviteRebateRatio = originalRatio
-		common.QuotaPerUnit = originalQuotaPerUnit
-		operation_setting.Price = originalPrice
-	})
-
-	insertPaymentGuardUserWithName(t, 501, "rebate_inviter", 0)
-	insertPaymentGuardUserWithName(t, 502, "rebate_invitee", 501)
-
-	plan := &SubscriptionPlan{
-		Id:            601,
-		Title:         "Rebate Plan",
-		PriceAmount:   10,
-		Currency:      "CNY",
-		DurationUnit:  SubscriptionDurationMonth,
-		DurationValue: 1,
-		Enabled:       true,
-		TotalAmount:   0,
-	}
-	require.NoError(t, DB.Create(plan).Error)
-
-	order := &SubscriptionOrder{
-		UserId:          502,
-		PlanId:          plan.Id,
-		Money:           plan.PriceAmount,
-		TradeNo:         "sub-rebate-order",
+func createEpayTestOrder(t *testing.T, userId int, tradeNo string, provider string, status string) TopUp {
+	t.Helper()
+	topUp := TopUp{
+		UserId:          userId,
+		Amount:          2,
+		Money:           10.0,
+		TradeNo:         tradeNo,
 		PaymentMethod:   "alipay",
-		PaymentProvider: PaymentProviderEpay,
-		Status:          common.TopUpStatusPending,
-		CreateTime:      time.Now().Unix(),
+		PaymentProvider: provider,
+		CreateTime:      common.GetTimestamp(),
+		Status:          status,
 	}
-	require.NoError(t, order.Insert())
-
-	require.NoError(t, CompleteSubscriptionOrder(order.TradeNo, `{"provider":"epay"}`, PaymentProviderEpay, "alipay"))
-
-	expectedBaseQuota := int((10 / operation_setting.Price) * common.QuotaPerUnit)
-	expectedRebateQuota := int(float64(expectedBaseQuota) * common.InviteRebateRatio)
-
-	var inviter User
-	require.NoError(t, DB.First(&inviter, 501).Error)
-	assert.Equal(t, expectedRebateQuota, inviter.AffQuota)
-	assert.Equal(t, expectedRebateQuota, inviter.AffHistoryQuota)
-
-	var rebate InviteRebate
-	require.NoError(t, DB.Where("source_type = ? AND source_id = ?", InviteRebateSourceSubscription, order.TradeNo).First(&rebate).Error)
-	assert.Equal(t, 501, rebate.InviterId)
-	assert.Equal(t, 502, rebate.InviteeId)
-	assert.Equal(t, expectedBaseQuota, rebate.BaseQuota)
-	assert.Equal(t, expectedRebateQuota, rebate.RebateQuota)
+	require.NoError(t, DB.Create(&topUp).Error)
+	return topUp
 }
 
-func TestAdminBindSubscription_GrantsInviteRebateFromPlanPriceOnce(t *testing.T) {
+func TestRechargeEpayCreditsQuotaExactlyOnce(t *testing.T) {
 	truncateTables(t)
 
-	originalEnabled := common.InviteRebateEnabled
-	originalRatio := common.InviteRebateRatio
-	originalQuotaPerUnit := common.QuotaPerUnit
-	originalPrice := operation_setting.Price
-	common.InviteRebateEnabled = true
-	common.InviteRebateRatio = 0.15
+	oldQuotaPerUnit := common.QuotaPerUnit
 	common.QuotaPerUnit = 500000
-	operation_setting.Price = 1
-	t.Cleanup(func() {
-		common.InviteRebateEnabled = originalEnabled
-		common.InviteRebateRatio = originalRatio
-		common.QuotaPerUnit = originalQuotaPerUnit
-		operation_setting.Price = originalPrice
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+
+	user := insertUserForPaymentGuardTest(t, 501, 0)
+	order := createEpayTestOrder(t, user.Id, "EPAYTESTONCE", PaymentProviderEpay, common.TopUpStatusPending)
+
+	alreadyDone, err := RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+	require.NoError(t, err)
+	assert.False(t, alreadyDone)
+	assert.Equal(t, 2*500000, getUserQuotaForPaymentGuardTest(t, user.Id))
+
+	reloaded := GetTopUpByTradeNo(order.TradeNo)
+	require.NotNil(t, reloaded)
+	assert.Equal(t, common.TopUpStatusSuccess, reloaded.Status)
+	assert.NotZero(t, reloaded.CompleteTime)
+
+	alreadyDone, err = RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+	require.NoError(t, err)
+	assert.True(t, alreadyDone)
+	assert.Equal(t, 2*500000, getUserQuotaForPaymentGuardTest(t, user.Id))
+}
+
+func TestRechargeEpayKeepsRedisAndDatabaseCreditInSync(t *testing.T) {
+	truncateTables(t)
+	useUserCacheMiniRedis(t)
+
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 5
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+
+	user := insertUserForPaymentGuardTest(t, 502, 7)
+	require.NoError(t, populateUserCache(*user))
+	order := createEpayTestOrder(t, user.Id, "EPAYTESTREDISSYNC", PaymentProviderEpay, common.TopUpStatusPending)
+
+	alreadyDone, err := RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+	require.NoError(t, err)
+	assert.False(t, alreadyDone)
+	assert.Equal(t, 17, getUserQuotaForPaymentGuardTest(t, user.Id))
+	cached, err := cacheGetUserBase(user.Id)
+	require.NoError(t, err)
+	assert.Equal(t, 17, cached.Quota)
+
+	alreadyDone, err = RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+	require.NoError(t, err)
+	assert.True(t, alreadyDone)
+	cached, err = cacheGetUserBase(user.Id)
+	require.NoError(t, err)
+	assert.Equal(t, 17, cached.Quota)
+}
+
+func TestRechargeEpayUpdatesPaymentMethodToActual(t *testing.T) {
+	truncateTables(t)
+
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 500000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+
+	user := insertUserForPaymentGuardTest(t, 503, 0)
+	order := createEpayTestOrder(t, user.Id, "EPAYTESTMETHOD", PaymentProviderEpay, common.TopUpStatusPending)
+
+	alreadyDone, err := RechargeEpay(order.TradeNo, "wxpay", "127.0.0.1")
+	require.NoError(t, err)
+	assert.False(t, alreadyDone)
+
+	reloaded := GetTopUpByTradeNo(order.TradeNo)
+	require.NotNil(t, reloaded)
+	assert.Equal(t, "wxpay", reloaded.PaymentMethod)
+	assert.Equal(t, 2*500000, getUserQuotaForPaymentGuardTest(t, user.Id))
+}
+
+func TestRechargeEpayRejectsForeignAndNonPendingOrders(t *testing.T) {
+	truncateTables(t)
+
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 500000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+
+	user := insertUserForPaymentGuardTest(t, 504, 7)
+
+	t.Run("order from another payment provider", func(t *testing.T) {
+		order := createEpayTestOrder(t, user.Id, "EPAYTESTSTRIPE", PaymentProviderStripe, common.TopUpStatusPending)
+		_, err := RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+		assert.ErrorIs(t, err, ErrPaymentMethodMismatch)
+		assert.Equal(t, 7, getUserQuotaForPaymentGuardTest(t, user.Id))
 	})
 
-	insertPaymentGuardUserWithName(t, 701, "admin_rebate_inviter", 0)
-	insertPaymentGuardUserWithName(t, 702, "admin_rebate_invitee", 701)
+	t.Run("order that is not pending", func(t *testing.T) {
+		order := createEpayTestOrder(t, user.Id, "EPAYTESTEXPIRED", PaymentProviderEpay, common.TopUpStatusExpired)
+		_, err := RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+		assert.ErrorIs(t, err, ErrTopUpStatusInvalid)
+		assert.Equal(t, 7, getUserQuotaForPaymentGuardTest(t, user.Id))
+	})
 
-	plan := &SubscriptionPlan{
-		Id:            801,
-		Title:         "Admin Rebate Plan",
-		PriceAmount:   20,
-		Currency:      "CNY",
-		DurationUnit:  SubscriptionDurationMonth,
-		DurationValue: 1,
-		Enabled:       true,
-		TotalAmount:   10000000,
+	t.Run("missing order", func(t *testing.T) {
+		_, err := RechargeEpay("EPAYTESTMISSING", "alipay", "127.0.0.1")
+		assert.ErrorIs(t, err, ErrTopUpNotFound)
+	})
+}
+
+func TestRechargeEpayRejectsQuotaOverflowBeforeCompletingOrder(t *testing.T) {
+	truncateTables(t)
+
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = float64(common.MaxQuota)
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+
+	user := insertUserForPaymentGuardTest(t, 505, 3)
+	order := createEpayTestOrder(t, user.Id, "EPAYTESTOVERFLOW", PaymentProviderEpay, common.TopUpStatusPending)
+
+	_, err := RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+	require.Error(t, err)
+	assert.Equal(t, 3, getUserQuotaForPaymentGuardTest(t, user.Id))
+	assert.Equal(t, common.TopUpStatusPending, getTopUpStatusForPaymentGuardTest(t, order.TradeNo))
+}
+
+func TestRechargeEpayEnforcesFinalWalletQuotaLimit(t *testing.T) {
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 500000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+
+	testCases := []struct {
+		name         string
+		currentQuota int
+		wantErr      bool
+		wantQuota    int
+		wantStatus   string
+	}{
+		{
+			name:         "allows exact highest representable wallet balance",
+			currentQuota: common.MaxQuota - 1 - 1_000_000,
+			wantQuota:    common.MaxQuota - 1,
+			wantStatus:   common.TopUpStatusSuccess,
+		},
+		{
+			name:         "rejects balance above int32 quota domain",
+			currentQuota: common.MaxQuota - 1_000_000,
+			wantErr:      true,
+			wantQuota:    common.MaxQuota - 1_000_000,
+			wantStatus:   common.TopUpStatusPending,
+		},
 	}
-	require.NoError(t, DB.Create(plan).Error)
 
-	_, err := AdminBindSubscription(702, plan.Id, "")
-	require.NoError(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			truncateTables(t)
+			user := insertUserForPaymentGuardTest(t, 506, tc.currentQuota)
+			order := createEpayTestOrder(t, user.Id, "EPAYTESTWALLETLIMIT", PaymentProviderEpay, common.TopUpStatusPending)
 
-	var subscription UserSubscription
-	require.NoError(t, DB.Where("user_id = ? AND plan_id = ? AND source = ?", 702, plan.Id, "admin").First(&subscription).Error)
-
-	expectedBaseQuota := int((plan.PriceAmount / operation_setting.Price) * common.QuotaPerUnit)
-	expectedRebateQuota := int(float64(expectedBaseQuota) * common.InviteRebateRatio)
-
-	var inviter User
-	require.NoError(t, DB.First(&inviter, 701).Error)
-	assert.Equal(t, expectedRebateQuota, inviter.AffQuota)
-	assert.Equal(t, expectedRebateQuota, inviter.AffHistoryQuota)
-
-	sourceId := fmt.Sprintf("admin-subscription-%d", subscription.Id)
-	var rebate InviteRebate
-	require.NoError(t, DB.Where("source_type = ? AND source_id = ?", InviteRebateSourceSubscription, sourceId).First(&rebate).Error)
-	assert.Equal(t, inviteRebatePaymentMethodAdmin, rebate.PaymentMethod)
-	assert.Equal(t, expectedBaseQuota, rebate.BaseQuota)
-	assert.Equal(t, expectedRebateQuota, rebate.RebateQuota)
-
-	require.NoError(t, grantAdminSubscriptionInviteRebateTx(DB, 702, plan, &subscription))
-	require.NoError(t, DB.First(&inviter, 701).Error)
-	assert.Equal(t, expectedRebateQuota, inviter.AffQuota)
-
-	var rebateCount int64
-	require.NoError(t, DB.Model(&InviteRebate{}).Where("source_type = ? AND source_id = ?", InviteRebateSourceSubscription, sourceId).Count(&rebateCount).Error)
-	assert.EqualValues(t, 1, rebateCount)
+			_, err := RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+			if tc.wantErr {
+				require.ErrorIs(t, err, ErrTopUpQuotaLimitExceeded)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.wantQuota, getUserQuotaForPaymentGuardTest(t, user.Id))
+			assert.Equal(t, tc.wantStatus, getTopUpStatusForPaymentGuardTest(t, order.TradeNo))
+		})
+	}
 }

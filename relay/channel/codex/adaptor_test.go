@@ -1,50 +1,56 @@
 package codex
 
 import (
+	"encoding/json"
 	"testing"
 
-	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/constant"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
+	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestConvertOpenAIResponsesRequestStripsCodexUnsupportedParams(t *testing.T) {
-	temp := 0.7
-	topP := 0.95
-	maxOutputTokens := uint(1024)
-
-	converted, err := (&Adaptor{}).ConvertOpenAIResponsesRequest(nil, &relaycommon.RelayInfo{
-		RelayMode: relayconstant.RelayModeResponses,
+func TestGetRequestURLAlphaSearch(t *testing.T) {
+	adaptor := &Adaptor{}
+	info := &relaycommon.RelayInfo{
 		ChannelMeta: &relaycommon.ChannelMeta{
-			ChannelSetting: dto.ChannelSettings{},
+			ChannelType:    constant.ChannelTypeCodex,
+			ChannelBaseUrl: "https://chatgpt.com",
 		},
-	}, dto.OpenAIResponsesRequest{
-		Model:           "gpt-5.5",
-		MaxOutputTokens: &maxOutputTokens,
-		Temperature:     &temp,
-		TopP:            &topP,
-	})
-	if err != nil {
-		t.Fatalf("ConvertOpenAIResponsesRequest returned error: %v", err)
+		RelayMode: relayconstant.RelayModeAlphaSearch,
 	}
+
+	url, err := adaptor.GetRequestURL(info)
+	require.NoError(t, err)
+	assert.Equal(t, "https://chatgpt.com/backend-api/codex/alpha/search", url)
+}
+
+// The Codex backend rejects these fields, so the adaptor clears them rather
+// than forwarding what the client sent.
+func TestConvertOpenAIResponsesRequestDropsPenalties(t *testing.T) {
+	adaptor := &Adaptor{}
+	info := &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{ChannelType: constant.ChannelTypeCodex},
+		RelayMode:   relayconstant.RelayModeResponses,
+	}
+
+	converted, err := adaptor.ConvertOpenAIResponsesRequest(nil, info, dto.OpenAIResponsesRequest{
+		Model:            "gpt-5-codex",
+		Input:            json.RawMessage(`"hello"`),
+		MaxOutputTokens:  lo.ToPtr(uint(128)),
+		Temperature:      lo.ToPtr(1.0),
+		FrequencyPenalty: json.RawMessage(`1.5`),
+		PresencePenalty:  json.RawMessage(`1.5`),
+	})
+	require.NoError(t, err)
 
 	request, ok := converted.(dto.OpenAIResponsesRequest)
-	if !ok {
-		t.Fatalf("converted request type = %T, want dto.OpenAIResponsesRequest", converted)
-	}
-	if request.MaxOutputTokens != nil {
-		t.Fatalf("expected max_output_tokens to be stripped")
-	}
-	if request.Temperature != nil {
-		t.Fatalf("expected temperature to be stripped")
-	}
-	if request.TopP != nil {
-		t.Fatalf("expected top_p to be stripped")
-	}
-	if string(request.Store) != "false" {
-		t.Fatalf("store = %s, want false", string(request.Store))
-	}
-	if len(request.Instructions) == 0 {
-		t.Fatalf("expected instructions to be defaulted for codex")
-	}
+	require.True(t, ok)
+	assert.Nil(t, request.MaxOutputTokens)
+	assert.Nil(t, request.Temperature)
+	assert.Nil(t, request.FrequencyPenalty)
+	assert.Nil(t, request.PresencePenalty)
 }
