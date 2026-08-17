@@ -3,7 +3,7 @@ package openai
 import (
 	"testing"
 
-	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 )
 
 func TestConvertOpenAIResponsesRequestStripsGPT5UnsupportedSamplingParams(t *testing.T) {

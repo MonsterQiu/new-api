@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/types"
+	"github.com/QuantumNous/new-api/relaykit/types"
 )
 
 func TestShouldDisableChannelQuotaExhausted429ByMessage(t *testing.T) {

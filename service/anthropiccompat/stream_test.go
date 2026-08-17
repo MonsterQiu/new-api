@@ -3,7 +3,7 @@ package anthropiccompat
 import (
 	"testing"
 
-	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 )
 
 func TestResponsesStreamToClaudeEventsConvertsFunctionCallArgumentDeltas(t *testing.T) {

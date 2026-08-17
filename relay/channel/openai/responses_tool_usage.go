@@ -1,8 +1,8 @@
 package openai
 
 import (
-	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 )
 
 const defaultResponsesImageGenerationModel = "gpt-image-2"
