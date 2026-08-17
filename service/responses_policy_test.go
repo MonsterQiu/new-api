@@ -1,4 +1,4 @@
-package relayconvert
+package service
 
 import (
 	"testing"

@@ -12,11 +12,13 @@
           "type": "input_image"
         }
       ],
-      "role": "user"
+      "role": "user",
+      "type": "message"
     },
     {
       "content": "",
-      "role": "assistant"
+      "role": "assistant",
+      "type": "message"
     },
     {
       "arguments": "{\"city\":\"Paris\"}",
@@ -30,8 +32,14 @@
       "type": "function_call_output"
     },
     {
-      "content": "Summarize.",
-      "role": "user"
+      "content": [
+        {
+          "text": "Summarize.",
+          "type": "input_text"
+        }
+      ],
+      "role": "user",
+      "type": "message"
     }
   ],
   "instructions": "You are a helpful assistant.",

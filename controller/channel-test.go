@@ -53,7 +53,7 @@ func normalizeChannelTestEndpoint(channel *model.Channel, endpointType string) s
 }
 
 func shouldChannelTestUseStream(channel *model.Channel, modelName, endpointType string) bool {
-	normalizedEndpoint := normalizeChannelTestEndpoint(channel, modelName, endpointType)
+	normalizedEndpoint := normalizeChannelTestEndpoint(channel, endpointType)
 	switch constant.EndpointType(normalizedEndpoint) {
 	case constant.EndpointTypeEmbeddings,
 		constant.EndpointTypeImageGeneration,

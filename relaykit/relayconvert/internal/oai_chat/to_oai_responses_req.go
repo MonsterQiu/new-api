@@ -73,6 +73,27 @@ func convertChatResponseFormatToResponsesText(reqFormat *dto.ResponseFormat) jso
 	return textRaw
 }
 
+func buildResponsesTextContent(role string, text string) []map[string]any {
+	textType := "input_text"
+	if role == "assistant" {
+		textType = "output_text"
+	}
+	return []map[string]any{
+		{
+			"type": textType,
+			"text": text,
+		},
+	}
+}
+
+func buildResponsesMessageItem(role string, content any) map[string]any {
+	return map[string]any{
+		"type":    "message",
+		"role":    role,
+		"content": content,
+	}
+}
+
 func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*dto.OpenAIResponsesRequest, error) {
 	if req == nil {
 		return nil, errors.New("request is nil")
@@ -110,10 +131,10 @@ func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*d
 			}
 
 			if callID == "" {
-				inputItems = append(inputItems, map[string]any{
-					"role":    "user",
-					"content": fmt.Sprintf("[tool_output_missing_call_id] %v", output),
-				})
+				inputItems = append(inputItems, buildResponsesMessageItem(
+					"user",
+					buildResponsesTextContent("user", fmt.Sprintf("[tool_output_missing_call_id] %v", output)),
+				))
 				continue
 			}
 
@@ -152,12 +173,9 @@ func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*d
 			continue
 		}
 
-		item := map[string]any{
-			"role": role,
-		}
+		item := buildResponsesMessageItem(role, "")
 
 		if msg.Content == nil {
-			item["content"] = ""
 			inputItems = append(inputItems, item)
 
 			if role == "assistant" {
@@ -184,7 +202,7 @@ func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*d
 		}
 
 		if msg.IsStringContent() {
-			item["content"] = msg.StringContent()
+			item["content"] = buildResponsesTextContent(role, msg.StringContent())
 			inputItems = append(inputItems, item)
 
 			if role == "assistant" {
@@ -389,24 +407,25 @@ func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*d
 	}
 
 	out := &dto.OpenAIResponsesRequest{
-		Model:             req.Model,
-		Input:             inputRaw,
-		Instructions:      instructionsRaw,
-		Stream:            req.Stream,
-		Temperature:       req.Temperature,
-		Text:              textRaw,
-		ToolChoice:        toolChoiceRaw,
-		Tools:             toolsRaw,
-		TopP:              topP,
-		FrequencyPenalty:  frequencyPenaltyRaw,
-		PresencePenalty:   presencePenaltyRaw,
-		User:              req.User,
-		ParallelToolCalls: parallelToolCallsRaw,
-		Store:             req.Store,
-		Metadata:          req.Metadata,
-		PromptCacheKey:    promptCacheKeyRaw,
-		EnableThinking:    req.EnableThinking,
-		ThinkingBudget:    req.ThinkingBudget,
+		Model:                req.Model,
+		Input:                inputRaw,
+		Instructions:         instructionsRaw,
+		Stream:               req.Stream,
+		Temperature:          req.Temperature,
+		Text:                 textRaw,
+		ToolChoice:           toolChoiceRaw,
+		Tools:                toolsRaw,
+		TopP:                 topP,
+		FrequencyPenalty:     frequencyPenaltyRaw,
+		PresencePenalty:      presencePenaltyRaw,
+		User:                 req.User,
+		ParallelToolCalls:    parallelToolCallsRaw,
+		Store:                req.Store,
+		Metadata:             req.Metadata,
+		PromptCacheKey:       promptCacheKeyRaw,
+		PromptCacheRetention: req.PromptCacheRetention,
+		EnableThinking:       req.EnableThinking,
+		ThinkingBudget:       req.ThinkingBudget,
 	}
 	if req.MaxTokens != nil || req.MaxCompletionTokens != nil {
 		out.MaxOutputTokens = lo.ToPtr(maxOutputTokens)

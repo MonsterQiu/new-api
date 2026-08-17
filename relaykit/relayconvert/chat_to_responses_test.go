@@ -3,8 +3,8 @@ package relayconvert
 import (
 	"testing"
 
-	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	kitutil "github.com/QuantumNous/new-api/relaykit/relayconvert/kitutil"
 )
 
 func TestChatCompletionsRequestToResponsesRequestNormalizesStringMessages(t *testing.T) {
@@ -25,7 +25,7 @@ func TestChatCompletionsRequestToResponsesRequestNormalizesStringMessages(t *tes
 	}
 
 	var instructions string
-	if err := common.Unmarshal(respReq.Instructions, &instructions); err != nil {
+	if err := kitutil.Unmarshal(respReq.Instructions, &instructions); err != nil {
 		t.Fatalf("failed to decode instructions: %v", err)
 	}
 	if instructions != "you are helpful" {
@@ -33,7 +33,7 @@ func TestChatCompletionsRequestToResponsesRequestNormalizesStringMessages(t *tes
 	}
 
 	var inputItems []map[string]any
-	if err := common.Unmarshal(respReq.Input, &inputItems); err != nil {
+	if err := kitutil.Unmarshal(respReq.Input, &inputItems); err != nil {
 		t.Fatalf("failed to decode input items: %v", err)
 	}
 	if len(inputItems) != 2 {
@@ -86,7 +86,7 @@ func TestChatCompletionsRequestToResponsesRequestKeepsTypedFallbackForToolOutput
 	}
 
 	var inputItems []map[string]any
-	if err := common.Unmarshal(respReq.Input, &inputItems); err != nil {
+	if err := kitutil.Unmarshal(respReq.Input, &inputItems); err != nil {
 		t.Fatalf("failed to decode input items: %v", err)
 	}
 	if len(inputItems) != 1 {
@@ -133,7 +133,7 @@ func TestChatCompletionsRequestToResponsesRequestPreservesPromptCacheFields(t *t
 	}
 
 	var cacheKey string
-	if err := common.Unmarshal(respReq.PromptCacheKey, &cacheKey); err != nil {
+	if err := kitutil.Unmarshal(respReq.PromptCacheKey, &cacheKey); err != nil {
 		t.Fatalf("failed to decode prompt_cache_key: %v", err)
 	}
 	if cacheKey != "cline-session-123" {
@@ -141,7 +141,7 @@ func TestChatCompletionsRequestToResponsesRequestPreservesPromptCacheFields(t *t
 	}
 
 	var retention string
-	if err := common.Unmarshal(respReq.PromptCacheRetention, &retention); err != nil {
+	if err := kitutil.Unmarshal(respReq.PromptCacheRetention, &retention); err != nil {
 		t.Fatalf("failed to decode prompt_cache_retention: %v", err)
 	}
 	if retention != "24h" {
