@@ -24,7 +24,6 @@ plans
 .claude
 .cursor
 deploy/.env.prod
-deploy/.env.enterprise
 deploy/.env.preview
 deploy/.env.release
 deploy/*.bak.*
