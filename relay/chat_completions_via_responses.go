@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net/http"
@@ -213,4 +214,25 @@ func relayResponsesRequest(c *gin.Context, info *relaycommon.RelayInfo, adaptor 
 
 func isResponsesEventStreamContentType(contentType string) bool {
 	return strings.Contains(strings.ToLower(contentType), "text/event-stream")
+}
+
+func detectResponsesEventStream(resp *http.Response) bool {
+	if resp == nil || resp.Body == nil {
+		return false
+	}
+
+	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	if isResponsesEventStreamContentType(contentType) {
+		return true
+	}
+
+	reader := bufio.NewReader(resp.Body)
+	sample, err := reader.Peek(128)
+	resp.Body = io.NopCloser(reader)
+	if err != nil && err != io.EOF {
+		return false
+	}
+
+	prefix := strings.TrimSpace(string(sample))
+	return strings.HasPrefix(prefix, "event:") || strings.HasPrefix(prefix, "data:")
 }
