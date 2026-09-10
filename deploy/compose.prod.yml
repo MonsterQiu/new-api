@@ -25,6 +25,11 @@ services:
       CONTACT_VALUE: ${CONTACT_VALUE:-}
     volumes:
       - ${APP_DATA_DIR:?set APP_DATA_DIR in the env file}:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     depends_on:
       - mysql
       - redis
@@ -50,12 +55,18 @@ services:
       - --innodb-log-file-size=256M
       - --innodb-flush-method=O_DIRECT
       - --max-connections=300
+      - --binlog-expire-logs-seconds=604800
     environment:
       TZ: ${TZ:-Asia/Shanghai}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in the env file}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-new-api}
     volumes:
       - ${MYSQL_DATA_DIR:?set MYSQL_DATA_DIR in the env file}:/var/lib/mysql
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     expose:
       - "3306"
     healthcheck:
@@ -84,6 +95,11 @@ services:
       - "yes"
     volumes:
       - ${APP_DATA_DIR:?set APP_DATA_DIR in the env file}/redis:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     expose:
       - "6379"
     healthcheck:
