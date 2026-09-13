@@ -94,13 +94,17 @@ API Key 是客户端访问中转服务的凭证。建议为不同客户端分别
 
 1. 为编程工具单独创建 API Key，并设置合理额度。
 2. 打开密钥操作菜单，选择导入到 CC Switch。
-3. 选择 Codex 或 Claude，并选择当前可用的主模型。
-4. 在 CC Switch 中确认、保存并启用供应商。
-5. 完全退出并重新打开对应客户端。
+3. 在“填入 CC Switch”窗口中选择要使用的应用。下面以 Codex 为例；Claude、Gemini 等应用选择对应选项即可，后续步骤相同。
+4. 选择当前可用的主模型。
+5. 核对供应商名称、官网地址、API 端点、API 密钥和模型。
+6. 在 CC Switch 中确认、保存并启用供应商。
+7. 完全退出并重新打开对应客户端。
 
-<!-- 上传图片后删除本注释的首尾标记：
-![导入 CC Switch](/documentation/images/03-cc-switch-import.webp)
--->
+![从 API Key 操作菜单打开 CC Switch 导入](/documentation/images/03-cc-switch-import-entry.png)
+
+![在 CC Switch 导入窗口选择 Codex 和主模型](/documentation/images/03-cc-switch-import-codex.png)
+
+![确认导入的 CC Switch 供应商配置](/documentation/images/03-cc-switch-import-confirm.png)
 
 ### Codex CLI 手动配置
 
