@@ -85,7 +85,7 @@ func collectResponsesStreamResponse(body io.Reader, fallbackModel string) (*dto.
 	response := &dto.OpenAIResponsesResponse{
 		Object:    "response",
 		Model:     fallbackModel,
-		CreatedAt: int(time.Now().Unix()),
+		CreatedAt: dto.IntValue(time.Now().Unix()),
 	}
 	var outputText strings.Builder
 
@@ -203,7 +203,7 @@ func collectResponsesStreamResponse(body io.Reader, fallbackModel string) (*dto.
 		response.Model = fallbackModel
 	}
 	if response.CreatedAt == 0 {
-		response.CreatedAt = int(time.Now().Unix())
+		response.CreatedAt = dto.IntValue(time.Now().Unix())
 	}
 	if len(response.Output) == 0 {
 		if outputText.Len() > 0 {

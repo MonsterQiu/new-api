@@ -1,6 +1,10 @@
 package ratio_setting
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestGetCompletionRatioInfoGPT55UsesOfficialOutputMultiplier(t *testing.T) {
 	info := GetCompletionRatioInfo("gpt-5.5")
@@ -8,9 +12,9 @@ func TestGetCompletionRatioInfoGPT55UsesOfficialOutputMultiplier(t *testing.T) {
 	if info.Ratio != 6 {
 		t.Fatalf("gpt-5.5 completion ratio = %v, want 6", info.Ratio)
 	}
-	if !info.Locked {
-		t.Fatal("gpt-5.5 completion ratio should be locked to the official multiplier")
-	}
+	assert.False(t, info.Locked, "the upstream default permits administrator overrides")
+	configured := 4.0
+	assert.Equal(t, CompletionRatioInfo{Ratio: configured}, ResolveCompletionRatio("gpt-5.5", &configured))
 }
 
 func TestGetCompletionRatioGPT55DatedVariant(t *testing.T) {

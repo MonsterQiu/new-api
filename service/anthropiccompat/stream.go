@@ -105,7 +105,7 @@ func (s *ResponsesToClaudeStreamState) mergeResponse(resp *dto.OpenAIResponsesRe
 		s.Model = resp.Model
 	}
 	if resp.CreatedAt != 0 {
-		s.CreatedAt = resp.CreatedAt
+		s.CreatedAt = int(resp.CreatedAt)
 	}
 }
 
